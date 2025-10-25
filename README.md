@@ -9,6 +9,8 @@ Bu proje, XAMPP altında `/htdocs/ders-programi` klasörüne kopyalanarak tamame
 - `public/widget.js`: Herhangi bir sayfaya gömülebilen geri sayım ve ders programı widget'ları.
 - `public/styles.css`: Ortak stil dosyası.
 - `public/widget-demo.html`: Widget'ların nasıl gömüleceğini gösteren örnek sayfa.
+- `public/widget-countdown.html`: Geri sayım widget'ı için bağımsız örnek sayfa.
+- `public/widget-schedule.html`: Ders programı widget'ı için bağımsız örnek sayfa.
 
 ## Yönetim Panelini Çalıştırma
 

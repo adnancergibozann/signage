@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ders Programı Widget'ı</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    body {
+      min-height: 100vh;
+      background: #f5f5f5;
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      margin: 0;
+      padding: 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    main {
+      width: min(960px, 100%);
+    }
+    header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    header p {
+      color: #4a4a4a;
+      font-size: 0.95rem;
+    }
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .control {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .control label {
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Ders Programı Widget'ı</h1>
+      <p>Bu sayfa, seçtiğiniz sınıf için günlük veya haftalık ders programı widget'ını görüntüler.</p>
+    </header>
+
+    <section class="controls">
+      <div class="control">
+        <label for="schedule-class-select">Sınıf Seçin</label>
+        <select id="schedule-class-select" class="input"></select>
+      </div>
+      <div class="control">
+        <label for="schedule-view-select">Görünüm</label>
+        <select id="schedule-view-select" class="input">
+          <option value="daily" selected>Bugünkü Program</option>
+          <option value="weekly">Haftalık Program</option>
+          <option value="daily,weekly">Bugün + Haftalık</option>
+        </select>
+      </div>
+    </section>
+
+    <section>
+      <div id="schedule-widget" data-widget="schedule" data-view="daily"></div>
+    </section>
+  </main>
+
+  <script src="widget.js"></script>
+  <script>
+    (function initSchedulePage() {
+      const STORAGE_KEY = 'dp_data_v1';
+      const classSelect = document.getElementById('schedule-class-select');
+      const viewSelect = document.getElementById('schedule-view-select');
+      const widgetContainer = document.getElementById('schedule-widget');
+
+      function getData() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          return raw ? JSON.parse(raw) : null;
+        } catch (error) {
+          console.error('LocalStorage verisi okunamadı.', error);
+          return null;
+        }
+      }
+
+      function populateClassOptions() {
+        const data = getData();
+        const currentClass = widgetContainer.getAttribute('data-class');
+        classSelect.innerHTML = '';
+
+        if (!data || !Array.isArray(data.classes) || data.classes.length === 0) {
+          const option = document.createElement('option');
+          option.textContent = 'Önce yönetim panelinden sınıf ekleyin';
+          option.disabled = true;
+          option.selected = true;
+          classSelect.appendChild(option);
+          classSelect.disabled = true;
+          widgetContainer.removeAttribute('data-class');
+          requestRender();
+          return;
+        }
+
+        classSelect.disabled = false;
+        let selectedSet = false;
+
+        data.classes.forEach(({ id, name }, index) => {
+          const option = document.createElement('option');
+          option.value = id;
+          option.textContent = name || id;
+          if (!selectedSet && (currentClass ? currentClass === id : index === 0)) {
+            option.selected = true;
+            classSelect.value = id;
+            widgetContainer.setAttribute('data-class', id);
+            selectedSet = true;
+          }
+          classSelect.appendChild(option);
+        });
+
+        if (!selectedSet && data.classes.length) {
+          const first = data.classes[0];
+          widgetContainer.setAttribute('data-class', first.id);
+          classSelect.value = first.id;
+        }
+
+        requestRender();
+      }
+
+      function requestRender() {
+        if (typeof window.dpWidgets?.render === 'function') {
+          window.dpWidgets.render();
+        }
+      }
+
+      classSelect.addEventListener('change', (event) => {
+        widgetContainer.setAttribute('data-class', event.target.value);
+        requestRender();
+      });
+
+      viewSelect.addEventListener('change', (event) => {
+        widgetContainer.setAttribute('data-view', event.target.value);
+        requestRender();
+      });
+
+      window.addEventListener('storage', (event) => {
+        if (event.key === STORAGE_KEY) {
+          populateClassOptions();
+        }
+      });
+
+      populateClassOptions();
+    })();
+  </script>
+</body>
+</html>

@@ -9,6 +9,10 @@
   function init() {
     injectStyles();
     renderWidgets();
+    window.dpWidgets = Object.assign(window.dpWidgets || {}, {
+      render: renderWidgets,
+      refresh: renderWidgets,
+    });
     window.addEventListener('storage', (event) => {
       if (event.key === STORAGE_KEY) {
         renderWidgets();
