@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ders Programı Yönetim Paneli</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="login-overlay" class="overlay hidden">
+    <div class="overlay-card">
+      <h1>Ders Programı Yönetimi</h1>
+      <p id="login-message"></p>
+      <form id="login-form">
+        <label for="login-password">Şifre</label>
+        <input id="login-password" name="password" type="password" required>
+        <button type="submit" class="primary">Giriş yap</button>
+      </form>
+      <button id="reset-password" class="link">Şifreyi sıfırla</button>
+    </div>
+  </div>
+
+  <header>
+    <h1>Ders Programı Yönetimi</h1>
+    <div class="actions">
+      <button id="export-button" class="secondary">JSON Dışa Aktar</button>
+      <label for="import-file" class="secondary file-input">JSON İçeri Al
+        <input type="file" id="import-file" accept="application/json">
+      </label>
+      <button id="logout-button" class="secondary">Kilitle</button>
+    </div>
+  </header>
+
+  <main>
+    <aside>
+      <nav>
+        <button data-section="classes" class="nav-button active">Sınıflar</button>
+        <button data-section="teachers" class="nav-button">Öğretmenler</button>
+        <button data-section="lessons" class="nav-button">Dersler</button>
+        <button data-section="slots" class="nav-button">Slotlar</button>
+        <button data-section="schedule" class="nav-button">Haftalık Program</button>
+        <button data-section="storage" class="nav-button">Depolama</button>
+      </nav>
+    </aside>
+    <section id="panel">
+      <div id="classes" class="panel-section">
+        <h2>Sınıflar</h2>
+        <form id="class-form" class="inline-form">
+          <input type="hidden" name="id">
+          <input type="text" name="name" placeholder="Sınıf adı" required>
+          <button type="submit" class="primary">Kaydet</button>
+          <button type="button" class="secondary" data-action="reset">Temizle</button>
+        </form>
+        <table>
+          <thead>
+            <tr><th>Sınıf</th><th>İşlemler</th></tr>
+          </thead>
+          <tbody id="class-list"></tbody>
+        </table>
+      </div>
+
+      <div id="teachers" class="panel-section hidden">
+        <h2>Öğretmenler</h2>
+        <form id="teacher-form" class="inline-form">
+          <input type="hidden" name="id">
+          <input type="text" name="name" placeholder="Öğretmen adı" required>
+          <button type="submit" class="primary">Kaydet</button>
+          <button type="button" class="secondary" data-action="reset">Temizle</button>
+        </form>
+        <table>
+          <thead>
+            <tr><th>Öğretmen</th><th>İşlemler</th></tr>
+          </thead>
+          <tbody id="teacher-list"></tbody>
+        </table>
+      </div>
+
+      <div id="lessons" class="panel-section hidden">
+        <h2>Dersler</h2>
+        <form id="lesson-form" class="inline-form">
+          <input type="hidden" name="id">
+          <input type="text" name="name" placeholder="Ders adı" required>
+          <select name="teacherId" required></select>
+          <button type="submit" class="primary">Kaydet</button>
+          <button type="button" class="secondary" data-action="reset">Temizle</button>
+        </form>
+        <table>
+          <thead>
+            <tr><th>Ders</th><th>Öğretmen</th><th>İşlemler</th></tr>
+          </thead>
+          <tbody id="lesson-list"></tbody>
+        </table>
+      </div>
+
+      <div id="slots" class="panel-section hidden">
+        <h2>Slotlar</h2>
+        <form id="slot-form" class="inline-form">
+          <input type="hidden" name="id">
+          <input type="text" name="name" placeholder="Slot adı" required>
+          <select name="type" required>
+            <option value="lesson">Ders</option>
+            <option value="break">Teneffüs</option>
+          </select>
+          <input type="time" name="start" required>
+          <input type="time" name="end" required>
+          <button type="submit" class="primary">Kaydet</button>
+          <button type="button" class="secondary" data-action="reset">Temizle</button>
+        </form>
+        <table>
+          <thead>
+            <tr><th>Slot</th><th>Tip</th><th>Başlangıç</th><th>Bitiş</th><th>İşlemler</th></tr>
+          </thead>
+          <tbody id="slot-list"></tbody>
+        </table>
+      </div>
+
+      <div id="schedule" class="panel-section hidden">
+        <h2>Haftalık Program</h2>
+        <div class="schedule-controls">
+          <select id="schedule-class"></select>
+          <select id="schedule-day"></select>
+        </div>
+        <table class="schedule-grid">
+          <thead>
+            <tr><th>Slot</th><th>İçerik</th></tr>
+          </thead>
+          <tbody id="schedule-list"></tbody>
+        </table>
+      </div>
+
+      <div id="storage" class="panel-section hidden">
+        <h2>Depolama Kullanımı</h2>
+        <p>localStorage kapasitesi sınırlıdır (~5-10 MB). Veriniz büyüdüğünde temizleme veya dışa aktarma yapmanız önerilir.</p>
+        <div id="storage-stats"></div>
+      </div>
+    </section>
+  </main>
+
+  <template id="action-buttons-template">
+    <div class="row-actions">
+      <button type="button" class="secondary" data-action="edit">Düzenle</button>
+      <button type="button" class="danger" data-action="delete">Sil</button>
+    </div>
+  </template>
+
+  <script src="app.js" type="module"></script>
+</body>
+</html>

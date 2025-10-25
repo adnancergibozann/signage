@@ -1,0 +1,279 @@
+:root {
+  --yellow: #ffd400;
+  --black: #0a0a0a;
+  --white: #ffffff;
+  --gray-100: #f5f5f5;
+  --gray-300: #d0d0d0;
+  --gray-600: #666666;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Segoe UI", system-ui, sans-serif;
+  background: var(--gray-100);
+  color: var(--black);
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+header {
+  background: var(--black);
+  color: var(--white);
+  padding: 1.5rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+header h1 {
+  margin: 0;
+  font-size: 1.8rem;
+}
+
+.actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+main {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+aside {
+  width: 230px;
+  background: var(--white);
+  border-right: 1px solid var(--gray-300);
+  padding: 1rem;
+}
+
+nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.nav-button {
+  padding: 0.75rem 1rem;
+  background: transparent;
+  border: 1px solid var(--gray-300);
+  border-radius: 0.5rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.nav-button.active, .nav-button:hover {
+  background: var(--yellow);
+  color: var(--black);
+  border-color: var(--yellow);
+}
+
+#panel {
+  flex: 1;
+  padding: 2rem;
+  overflow-y: auto;
+  background: var(--white);
+}
+
+.panel-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.panel-section.hidden {
+  display: none;
+}
+
+.inline-form {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.inline-form input,
+.inline-form select {
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--gray-300);
+  min-width: 160px;
+}
+
+button.primary,
+button.secondary,
+button.danger,
+button.link,
+label.file-input {
+  border-radius: 0.5rem;
+  border: none;
+  cursor: pointer;
+  padding: 0.6rem 1rem;
+  font-weight: 600;
+}
+
+button.primary {
+  background: var(--yellow);
+  color: var(--black);
+}
+
+button.secondary, label.file-input {
+  background: var(--gray-300);
+  color: var(--black);
+  border: 1px solid transparent;
+}
+
+button.secondary:hover,
+label.file-input:hover {
+  border-color: var(--yellow);
+}
+
+button.danger {
+  background: #ff4d4f;
+  color: var(--white);
+}
+
+button.link {
+  background: transparent;
+  color: var(--black);
+  text-decoration: underline;
+  padding: 0.25rem 0;
+}
+
+label.file-input {
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+}
+
+label.file-input input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--white);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+}
+
+table th, table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--gray-300);
+  text-align: left;
+}
+
+table th {
+  background: var(--gray-100);
+  font-weight: 700;
+}
+
+.row-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.schedule-controls {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.schedule-grid th:first-child,
+.schedule-grid td:first-child {
+  width: 220px;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 10, 10, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.overlay.hidden {
+  display: none;
+}
+
+.overlay-card {
+  background: var(--white);
+  padding: 2rem;
+  border-radius: 1rem;
+  max-width: 360px;
+  width: 90%;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  text-align: center;
+}
+
+#login-message {
+  min-height: 2.4rem;
+  color: var(--gray-600);
+}
+
+#storage-stats {
+  background: var(--gray-100);
+  padding: 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--gray-300);
+  line-height: 1.6;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: var(--yellow);
+  color: var(--black);
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.schedule-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.schedule-item select {
+  flex: 1;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--gray-300);
+}
+
+@media (max-width: 900px) {
+  main {
+    flex-direction: column;
+  }
+
+  aside {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--gray-300);
+  }
+}
