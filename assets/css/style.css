@@ -1,0 +1,209 @@
+:root {
+    --color-yellow: #ffd000;
+    --color-black: #101010;
+    --color-white: #ffffff;
+    --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+@keyframes marquee-scroll {
+    0% {
+        transform: translateX(100%);
+    }
+    100% {
+        transform: translateX(-100%);
+    }
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: var(--font-family);
+    background-color: var(--color-black);
+    color: var(--color-white);
+}
+
+body.widget-body {
+    background: transparent;
+    color: inherit;
+}
+
+.marquee-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 3rem 1rem;
+    background: linear-gradient(135deg, var(--color-black) 0%, #1f1f1f 100%);
+}
+
+body.widget-body .marquee-wrapper {
+    min-height: auto;
+    padding: 0.5rem;
+    background: transparent;
+}
+
+.marquee {
+    position: relative;
+    overflow: hidden;
+    width: 90%;
+    max-width: 960px;
+    border: 4px solid var(--color-yellow);
+    border-radius: 20px;
+    background-color: rgba(0, 0, 0, 0.85);
+    padding: 1.5rem;
+}
+
+body.widget-body .marquee {
+    width: 100%;
+    max-width: none;
+    border-width: 2px;
+    border-radius: 14px;
+    padding: 0.75rem 1rem;
+}
+
+.marquee-track {
+    position: relative;
+    white-space: nowrap;
+    display: inline-block;
+    color: var(--color-yellow);
+    font-weight: 700;
+}
+
+.admin-body {
+    background: linear-gradient(135deg, var(--color-black) 0%, #2a2a2a 100%);
+    color: var(--color-white);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem 1rem;
+}
+
+.admin-container {
+    background-color: rgba(16, 16, 16, 0.9);
+    border: 2px solid var(--color-yellow);
+    border-radius: 16px;
+    padding: 2rem;
+    max-width: 520px;
+    width: 100%;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+.admin-container h1 {
+    margin-top: 0;
+    text-align: center;
+    color: var(--color-yellow);
+}
+
+.admin-description {
+    font-size: 0.95rem;
+    text-align: center;
+    margin-bottom: 1.5rem;
+    color: #f5f5f5;
+}
+
+.admin-form {
+    display: grid;
+    gap: 1rem;
+}
+
+.admin-form label {
+    font-weight: 600;
+    color: var(--color-yellow);
+}
+
+.admin-form textarea,
+.admin-form input {
+    width: 100%;
+    padding: 0.75rem;
+    border-radius: 8px;
+    border: 1px solid #333;
+    background-color: rgba(255, 255, 255, 0.05);
+    color: var(--color-white);
+    resize: vertical;
+}
+
+.btn-submit {
+    padding: 0.85rem 1rem;
+    border: none;
+    border-radius: 10px;
+    background-color: var(--color-yellow);
+    color: var(--color-black);
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.btn-submit:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 15px rgba(255, 208, 0, 0.3);
+}
+
+.alert {
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+}
+
+.alert-error {
+    background-color: rgba(255, 51, 51, 0.15);
+    color: #ff6666;
+    border: 1px solid rgba(255, 102, 102, 0.5);
+}
+
+.alert-success {
+    background-color: rgba(63, 208, 128, 0.15);
+    color: #7affc6;
+    border: 1px solid rgba(122, 255, 198, 0.5);
+}
+
+.admin-hint {
+    margin-top: 1rem;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.9rem;
+}
+
+.preview-link {
+    display: block;
+    margin-top: 1rem;
+    text-align: center;
+    color: var(--color-yellow);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.preview-link:hover {
+    text-decoration: underline;
+}
+
+.logout-form {
+    margin-top: 2rem;
+    text-align: center;
+}
+
+.btn-logout {
+    padding: 0.65rem 1.25rem;
+    border: 1px solid var(--color-yellow);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--color-yellow);
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.btn-logout:hover {
+    background-color: var(--color-yellow);
+    color: var(--color-black);
+}
+
+@media (max-width: 600px) {
+    .admin-container {
+        padding: 1.5rem;
+    }
+}
