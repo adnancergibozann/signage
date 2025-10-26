@@ -300,12 +300,18 @@ function esc_html(?string $value): string
                         <div>
                             <p class="countdown-title"><?php echo esc_html($event['title']); ?></p>
                             <div class="countdown-timer" style="--countdown-color: <?php echo esc_html($event['color']); ?>;">
-                                <span data-role="countdown-days">0</span>
-                                <label>Gün</label>
-                                <span data-role="countdown-hours">00</span>
-                                <label>Saat</label>
-                                <span data-role="countdown-minutes">00</span>
-                                <label>Dakika</label>
+                                <div class="countdown-segment">
+                                    <span class="countdown-value" data-role="countdown-days">0</span>
+                                    <span class="countdown-label">Gün</span>
+                                </div>
+                                <div class="countdown-segment">
+                                    <span class="countdown-value" data-role="countdown-hours">00</span>
+                                    <span class="countdown-label">Saat</span>
+                                </div>
+                                <div class="countdown-segment">
+                                    <span class="countdown-value" data-role="countdown-minutes">00</span>
+                                    <span class="countdown-label">Dakika</span>
+                                </div>
                             </div>
                         </div>
                     </div>
