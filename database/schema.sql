@@ -84,6 +84,7 @@ CREATE TABLE IF NOT EXISTS schedule_periods (
     label VARCHAR(50) NOT NULL,
     start_time TIME NOT NULL,
     end_time TIME NOT NULL,
+    period_type ENUM('lesson', 'break') NOT NULL DEFAULT 'lesson',
     UNIQUE KEY uniq_period_number (period_number)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -118,6 +119,33 @@ CREATE TABLE IF NOT EXISTS news_items (
     is_active TINYINT(1) NOT NULL DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_news_active (is_active, published_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS news_feeds (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(150) NOT NULL,
+    feed_url VARCHAR(255) NOT NULL,
+    items_limit TINYINT UNSIGNED NOT NULL DEFAULT 5,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    last_checked_at DATETIME NULL,
+    last_status VARCHAR(120) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_feed_url (feed_url)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS news_feed_items (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    feed_id INT UNSIGNED NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    summary TEXT NULL,
+    image_url VARCHAR(255) NULL,
+    source_url VARCHAR(255) NULL,
+    published_at DATETIME NULL,
+    fetched_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_feed_article (feed_id, source_url(180)),
+    INDEX idx_feed_items_published (feed_id, published_at),
+    CONSTRAINT fk_feed_items_feed FOREIGN KEY (feed_id) REFERENCES news_feeds(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS countdowns (

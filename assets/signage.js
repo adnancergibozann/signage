@@ -4,7 +4,8 @@
     const sliderSelectors = {
         media: '.media-slide',
         schedule: '.schedule-slide',
-        countdown: '.countdown-card'
+        countdown: '.countdown-card',
+        news: '.news-card'
     };
 
     function initSliders() {
@@ -27,7 +28,27 @@
 
             const activate = index => {
                 slides.forEach((slide, idx) => {
-                    slide.classList.toggle('active', idx === index);
+                    const isActive = idx === index;
+                    slide.classList.toggle('active', isActive);
+
+                    slide.querySelectorAll('video').forEach(video => {
+                        if (isActive) {
+                            const tryPlay = () => {
+                                video.play().catch(() => {
+                                    /* autoplay might be blocked */
+                                });
+                            };
+
+                            if (video.readyState >= 2) {
+                                tryPlay();
+                            } else {
+                                video.addEventListener('canplay', tryPlay, { once: true });
+                            }
+                        } else {
+                            video.pause();
+                            video.currentTime = 0;
+                        }
+                    });
                 });
             };
 
@@ -102,40 +123,270 @@
     }
 
     function initNextPeriodTimer() {
-        const section = document.querySelector('.next-period[data-next-change]');
+        const section = document.querySelector('.next-period');
         if (!section) {
             return;
         }
 
-        const targetValue = section.getAttribute('data-next-change');
+        const signageData = window.__SIGNAGE__ || {};
+        const periods = Array.isArray(signageData.periods) ? signageData.periods : [];
+
+        const iconEl = section.querySelector('[data-role="next-period-icon"]');
+        const labelEl = section.querySelector('[data-role="next-period-label"]');
+        const countdownEl = section.querySelector('[data-role="next-period-countdown"]');
         const minutesEl = section.querySelector('[data-role="next-period-minutes"]');
         const secondsEl = section.querySelector('[data-role="next-period-seconds"]');
-        if (!targetValue || !minutesEl || !secondsEl) {
-            return;
-        }
+        const messageEl = section.querySelector('[data-role="next-period-message"]');
+        const metaEl = section.querySelector('[data-role="next-period-meta"]');
+        const metaLabelEl = section.querySelector('[data-role="next-period-meta-label"]');
+        const metaTimeEl = section.querySelector('[data-role="next-period-meta-time"]');
 
-        const targetDate = parseDate(targetValue);
-        if (!targetDate) {
-            return;
-        }
+        const stateIcons = {
+            lesson: '📚',
+            break: '☕',
+            'before-school': '🌅',
+            'after-school': '🏠',
+            unconfigured: '⚙️'
+        };
 
-        const update = () => {
-            const diffMs = targetDate.getTime() - Date.now();
-            if (diffMs <= 0) {
-                minutesEl.textContent = '0';
-                secondsEl.textContent = '00';
+        const setHidden = (element, hidden) => {
+            if (!element) {
+                return;
+            }
+            if (hidden) {
+                element.setAttribute('hidden', '');
+            } else {
+                element.removeAttribute('hidden');
+            }
+        };
+
+        const parsePeriodTime = (value, referenceDate) => {
+            if (!value) {
+                return null;
+            }
+            const [hourStr, minuteStr] = value.split(':');
+            const hour = Number.parseInt(hourStr, 10);
+            const minute = Number.parseInt(minuteStr, 10);
+            if (Number.isNaN(hour) || Number.isNaN(minute)) {
+                return null;
+            }
+            const result = new Date(referenceDate);
+            result.setHours(hour, minute, 0, 0);
+            return result;
+        };
+
+        const buildTimeline = (referenceDate) => periods
+            .map(period => {
+                const start = parsePeriodTime(period.start_time, referenceDate);
+                const end = parsePeriodTime(period.end_time, referenceDate);
+                if (!start || !end) {
+                    return null;
+                }
+                return {
+                    label: period.label || '',
+                    type: period.type || 'lesson',
+                    start,
+                    end
+                };
+            })
+            .filter(Boolean)
+            .sort((a, b) => a.start - b.start);
+
+        const diffParts = (future, now) => {
+            const diffMs = Math.max(0, future.getTime() - now.getTime());
+            const totalSeconds = Math.floor(diffMs / 1000);
+            return {
+                minutes: Math.floor(totalSeconds / 60),
+                seconds: totalSeconds % 60
+            };
+        };
+
+        const formatLabel = slot => slot.label || (slot.type === 'break' ? 'Teneffüs' : 'Ders');
+
+        const formatTime = date => date.toLocaleTimeString('tr-TR', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+        });
+
+        const formatNext = slot => ({
+            label: formatLabel(slot),
+            starts_at: formatTime(slot.start),
+            type: slot.type
+        });
+
+        const computeState = (now) => {
+            const weekday = now.getDay();
+            if (weekday === 0 || weekday === 6) {
+                return {
+                    state: 'after-school',
+                    label: 'Hafta Sonu',
+                    message: 'Okulumuz tatilde',
+                    timeLeft: null,
+                    nextChangeAt: null,
+                    nextPeriod: null
+                };
+            }
+
+            const timeline = buildTimeline(now);
+            if (!timeline.length) {
+                return {
+                    state: 'unconfigured',
+                    label: 'Ders saatleri tanımlanmadı',
+                    message: '',
+                    timeLeft: null,
+                    nextChangeAt: null,
+                    nextPeriod: null
+                };
+            }
+
+            const first = timeline[0];
+            const last = timeline[timeline.length - 1];
+
+            if (now < first.start) {
+                return {
+                    state: 'before-school',
+                    label: 'Okulumuz Açılıyor',
+                    message: '',
+                    timeLeft: diffParts(first.start, now),
+                    nextChangeAt: first.start,
+                    nextPeriod: formatNext(first)
+                };
+            }
+
+            if (now >= last.end) {
+                return {
+                    state: 'after-school',
+                    label: 'Okulumuz Kapandı',
+                    message: 'Yarın görüşmek üzere',
+                    timeLeft: null,
+                    nextChangeAt: null,
+                    nextPeriod: null
+                };
+            }
+
+            for (let i = 0; i < timeline.length; i += 1) {
+                const slot = timeline[i];
+                const nextSlot = timeline[i + 1] || null;
+
+                if (now >= slot.start && now < slot.end) {
+                    const state = slot.type === 'break' ? 'break' : 'lesson';
+                    return {
+                        state,
+                        label: formatLabel(slot),
+                        message: '',
+                        timeLeft: diffParts(slot.end, now),
+                        nextChangeAt: slot.end,
+                        nextPeriod: nextSlot ? formatNext(nextSlot) : null
+                    };
+                }
+
+                if (now < slot.start) {
+                    return {
+                        state: 'break',
+                        label: 'Teneffüs',
+                        message: '',
+                        timeLeft: diffParts(slot.start, now),
+                        nextChangeAt: slot.start,
+                        nextPeriod: formatNext(slot)
+                    };
+                }
+            }
+
+            return {
+                state: 'after-school',
+                label: 'Okulumuz Kapandı',
+                message: 'Yarın görüşmek üzere',
+                timeLeft: null,
+                nextChangeAt: null,
+                nextPeriod: null
+            };
+        };
+
+        const parseServerState = (raw) => {
+            if (!raw || typeof raw !== 'object') {
+                return null;
+            }
+            const nextChangeAt = raw.next_change_at ? parseDate(raw.next_change_at) : null;
+            const rawTime = raw.timeLeft || raw.time_left;
+            const timeLeft = rawTime && typeof rawTime === 'object'
+                ? {
+                    minutes: Number.parseInt(rawTime.minutes ?? 0, 10) || 0,
+                    seconds: Number.parseInt(rawTime.seconds ?? 0, 10) || 0
+                }
+                : null;
+            const nextPeriod = raw.next_period && typeof raw.next_period === 'object'
+                ? {
+                    label: raw.next_period.label || '',
+                    starts_at: raw.next_period.starts_at || '',
+                    type: raw.next_period.type || 'lesson'
+                }
+                : null;
+
+            return {
+                state: raw.state || 'unconfigured',
+                label: raw.label || '',
+                message: raw.message || '',
+                timeLeft,
+                nextChangeAt,
+                nextPeriod
+            };
+        };
+
+        const render = (state) => {
+            if (!state) {
                 return;
             }
 
-            const totalSeconds = Math.floor(diffMs / 1000);
-            const minutes = Math.floor(totalSeconds / 60);
-            const seconds = totalSeconds % 60;
-            minutesEl.textContent = String(minutes);
-            secondsEl.textContent = String(seconds).padStart(2, '0');
+            section.dataset.state = state.state;
+            if (state.nextChangeAt instanceof Date && !Number.isNaN(state.nextChangeAt.getTime())) {
+                section.setAttribute('data-next-change', state.nextChangeAt.toISOString());
+            } else {
+                section.removeAttribute('data-next-change');
+            }
+
+            if (iconEl) {
+                iconEl.textContent = stateIcons[state.state] || 'ℹ️';
+            }
+
+            if (labelEl) {
+                labelEl.textContent = state.label || '';
+            }
+
+            if (messageEl) {
+                messageEl.textContent = state.message || '';
+            }
+            setHidden(messageEl, !state.message);
+
+            if (minutesEl && secondsEl && state.timeLeft) {
+                minutesEl.textContent = String(state.timeLeft.minutes);
+                secondsEl.textContent = String(state.timeLeft.seconds).padStart(2, '0');
+            }
+            setHidden(countdownEl, !state.timeLeft);
+
+            if (state.nextPeriod && metaLabelEl && metaTimeEl) {
+                metaLabelEl.textContent = state.nextPeriod.label || '';
+                metaTimeEl.textContent = state.nextPeriod.starts_at || '';
+            }
+            setHidden(metaEl, !state.nextPeriod);
         };
 
-        update();
-        setInterval(update, 1000);
+        const serverState = parseServerState(signageData.nextPeriod);
+        if (serverState) {
+            render(serverState);
+        }
+
+        if (!periods.length) {
+            return;
+        }
+
+        const refresh = () => {
+            const state = computeState(new Date());
+            render(state);
+        };
+
+        refresh();
+        setInterval(refresh, 1000);
     }
 
     document.addEventListener('DOMContentLoaded', () => {

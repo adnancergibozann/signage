@@ -101,10 +101,24 @@ function fetch_active_media_items(): array
     $stmt = $pdo->prepare('SELECT title, type, source, storage_path, duration_seconds FROM media_items WHERE is_active = 1 AND (expires_at IS NULL OR expires_at >= :now) ORDER BY position ASC, id ASC');
     $stmt->execute(['now' => (new \DateTimeImmutable('now'))->format('Y-m-d H:i:s')]);
     $items = [];
+    $mimeMap = [
+        'mp4' => 'video/mp4',
+        'webm' => 'video/webm',
+        'ogv' => 'video/ogg',
+        'ogg' => 'video/ogg',
+        'mov' => 'video/quicktime',
+    ];
+
     foreach ($stmt->fetchAll() as $item) {
         $source = $item['source'];
+        $mime = null;
         if (!empty($item['storage_path'])) {
-            $source = asset_url($item['storage_path']);
+            $storagePath = ltrim($item['storage_path'], '/');
+            $source = asset_url($storagePath);
+            $ext = strtolower(pathinfo($storagePath, PATHINFO_EXTENSION));
+            if (isset($mimeMap[$ext])) {
+                $mime = $mimeMap[$ext];
+            }
         }
 
         $items[] = [
@@ -112,6 +126,7 @@ function fetch_active_media_items(): array
             'type' => $item['type'],
             'source' => $source,
             'is_local' => !empty($item['storage_path']),
+            'mime' => $mime,
             'duration' => max(3, (int) $item['duration_seconds']),
         ];
     }
@@ -122,7 +137,7 @@ function fetch_active_media_items(): array
 function fetch_schedule_periods(): array
 {
     $pdo = get_pdo();
-    $stmt = $pdo->query('SELECT period_number, label, start_time, end_time FROM schedule_periods ORDER BY period_number ASC');
+    $stmt = $pdo->query('SELECT period_number, label, start_time, end_time, period_type FROM schedule_periods ORDER BY start_time ASC');
     $periods = [];
     foreach ($stmt->fetchAll() as $row) {
         $periods[] = [
@@ -130,6 +145,7 @@ function fetch_schedule_periods(): array
             'label' => $row['label'],
             'start_time' => $row['start_time'],
             'end_time' => $row['end_time'],
+            'type' => $row['period_type'] ?? 'lesson',
         ];
     }
 
@@ -175,8 +191,9 @@ function fetch_weekly_schedule(): array
 function fetch_latest_news(): array
 {
     $pdo = get_pdo();
-    $stmt = $pdo->query('SELECT title, summary, image_url, source_url, published_at FROM news_items WHERE is_active = 1 ORDER BY COALESCE(published_at, created_at) DESC LIMIT 10');
+    $stmt = $pdo->query('SELECT title, summary, image_url, source_url, published_at, created_at FROM news_items WHERE is_active = 1 ORDER BY COALESCE(published_at, created_at) DESC LIMIT 15');
     $items = [];
+
     foreach ($stmt->fetchAll() as $row) {
         $items[] = [
             'title' => $row['title'],
@@ -184,10 +201,43 @@ function fetch_latest_news(): array
             'image_url' => $row['image_url'],
             'source_url' => $row['source_url'],
             'published_at' => $row['published_at'],
+            'fetched_at' => $row['published_at'] ?? $row['created_at'] ?? null,
         ];
     }
 
-    return $items;
+    $feedStmt = $pdo->query('SELECT i.title, i.summary, i.image_url, i.source_url, i.published_at, i.fetched_at FROM news_feed_items i INNER JOIN news_feeds f ON f.id = i.feed_id WHERE f.is_active = 1 ORDER BY COALESCE(i.published_at, i.fetched_at) DESC');
+
+    foreach ($feedStmt->fetchAll() as $row) {
+        $items[] = [
+            'title' => $row['title'],
+            'summary' => $row['summary'],
+            'image_url' => $row['image_url'],
+            'source_url' => $row['source_url'],
+            'published_at' => $row['published_at'],
+            'fetched_at' => $row['fetched_at'],
+        ];
+    }
+
+    usort($items, static function (array $a, array $b) {
+        $timeA = $a['published_at'] ?? $a['fetched_at'] ?? null;
+        $timeB = $b['published_at'] ?? $b['fetched_at'] ?? null;
+
+        if ($timeA === $timeB) {
+            return 0;
+        }
+
+        if ($timeA === null) {
+            return 1;
+        }
+
+        if ($timeB === null) {
+            return -1;
+        }
+
+        return strcmp($timeB, $timeA);
+    });
+
+    return array_slice($items, 0, 15);
 }
 
 function fetch_active_countdowns(): array
@@ -229,31 +279,34 @@ function compute_next_period_state(array $periods): array
         ];
     }
 
-    $sorted = $periods;
-    usort($sorted, static function ($a, $b) {
-        return strcmp($a['start_time'], $b['start_time']);
-    });
-
-    $firstStart = new \DateTimeImmutable($sorted[0]['start_time'], $timezone);
-    $lastEnd = new \DateTimeImmutable($sorted[count($sorted) - 1]['end_time'], $timezone);
-
-    $firstStart = $now->setTime((int) $firstStart->format('H'), (int) $firstStart->format('i'));
-    $lastEnd = $now->setTime((int) $lastEnd->format('H'), (int) $lastEnd->format('i'));
-
-    if ($now < $firstStart) {
-        return [
-            'state' => 'before-school',
-            'label' => 'Okulumuz Açılıyor',
-            'timeLeft' => diff_to_array($now->diff($firstStart)),
-            'next_change_at' => $firstStart->format(\DateTimeInterface::ATOM),
-            'next_period' => [
-                'label' => $sorted[0]['label'],
-                'starts_at' => $sorted[0]['start_time'],
-            ],
+    $timeline = [];
+    foreach ($periods as $period) {
+        $timeline[] = [
+            'label' => $period['label'],
+            'type' => $period['type'] ?? 'lesson',
+            'start' => to_datetime($period['start_time'], $timezone, $now),
+            'end' => to_datetime($period['end_time'], $timezone, $now),
         ];
     }
 
-    if ($now >= $lastEnd) {
+    usort($timeline, static function (array $a, array $b) {
+        return $a['start'] <=> $b['start'];
+    });
+
+    $first = $timeline[0];
+    $last = $timeline[count($timeline) - 1];
+
+    if ($now < $first['start']) {
+        return [
+            'state' => 'before-school',
+            'label' => 'Okulumuz Açılıyor',
+            'timeLeft' => diff_to_array($now->diff($first['start'])),
+            'next_change_at' => $first['start']->format(\DateTimeInterface::ATOM),
+            'next_period' => format_next_period_context($first),
+        ];
+    }
+
+    if ($now >= $last['end']) {
         return [
             'state' => 'after-school',
             'label' => 'Okulumuz Kapandı',
@@ -261,41 +314,34 @@ function compute_next_period_state(array $periods): array
         ];
     }
 
-    foreach ($sorted as $index => $period) {
-        $start = to_datetime($period['start_time'], $timezone, $now);
-        $end = to_datetime($period['end_time'], $timezone, $now);
+    foreach ($timeline as $index => $slot) {
+        $nextSlot = $timeline[$index + 1] ?? null;
 
-        if ($now >= $start && $now < $end) {
-            $next = $sorted[$index + 1] ?? null;
+        if ($now >= $slot['start'] && $now < $slot['end']) {
+            $state = $slot['type'] === 'break' ? 'break' : 'lesson';
+            $label = $slot['label'] ?: ($state === 'break' ? 'Teneffüs' : 'Ders');
+
             return [
-                'state' => 'lesson',
-                'label' => $period['label'],
-                'timeLeft' => diff_to_array($now->diff($end)),
-                'next_change_at' => $end->format(\DateTimeInterface::ATOM),
-                'next_period' => $next ? [
-                    'label' => $next['label'],
-                    'starts_at' => $next['start_time'],
-                ] : null,
+                'state' => $state,
+                'label' => $label,
+                'timeLeft' => diff_to_array($now->diff($slot['end'])),
+                'next_change_at' => $slot['end']->format(\DateTimeInterface::ATOM),
+                'next_period' => $nextSlot ? format_next_period_context($nextSlot) : null,
             ];
         }
 
-        if ($now >= $end) {
-            $next = $sorted[$index + 1] ?? null;
-            if ($next) {
-                $nextStart = to_datetime($next['start_time'], $timezone, $now);
-                if ($now < $nextStart) {
-                    return [
-                        'state' => 'break',
-                        'label' => 'Teneffüs',
-                        'timeLeft' => diff_to_array($now->diff($nextStart)),
-                        'next_change_at' => $nextStart->format(\DateTimeInterface::ATOM),
-                        'next_period' => [
-                            'label' => $next['label'],
-                            'starts_at' => $next['start_time'],
-                        ],
-                    ];
-                }
-            }
+        if ($now < $slot['start']) {
+            // we are in a gap between slots; treat as break until the next one begins
+            $state = 'break';
+            $label = 'Teneffüs';
+
+            return [
+                'state' => $state,
+                'label' => $label,
+                'timeLeft' => diff_to_array($now->diff($slot['start'])),
+                'next_change_at' => $slot['start']->format(\DateTimeInterface::ATOM),
+                'next_period' => format_next_period_context($slot),
+            ];
         }
     }
 
@@ -303,6 +349,20 @@ function compute_next_period_state(array $periods): array
         'state' => 'after-school',
         'label' => 'Okulumuz Kapandı',
         'message' => 'Yarın görüşmek üzere',
+    ];
+}
+
+function format_next_period_context(array $period): array
+{
+    $label = $period['label'] ?? '';
+    if ($label === '' && (($period['type'] ?? '') === 'break')) {
+        $label = 'Teneffüs';
+    }
+
+    return [
+        'label' => $label,
+        'starts_at' => $period['start']->format('H:i'),
+        'type' => $period['type'] ?? 'lesson',
     ];
 }
 

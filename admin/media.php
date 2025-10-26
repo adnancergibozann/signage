@@ -4,6 +4,18 @@ require_once __DIR__ . '/../includes/signage.php';
 
 require_login();
 
+if (!function_exists('ensure_media_upload_dir')) {
+    function ensure_media_upload_dir(): ?string
+    {
+        $dir = __DIR__ . '/../public/uploads/media';
+        if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+            return null;
+        }
+
+        return $dir;
+    }
+}
+
 $activePage = 'media';
 $user = current_user();
 $errors = [];
@@ -60,8 +72,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } elseif ($_FILES['video_file']['size'] > 150 * 1024 * 1024) {
                         $errors[] = 'Video dosyası 150MB sınırını aşmamalıdır.';
                     } else {
-                        $uploadDir = __DIR__ . '/../public/uploads/media';
-                        if (!is_dir($uploadDir) && !mkdir($uploadDir, 0775, true) && !is_dir($uploadDir)) {
+                        $uploadDir = ensure_media_upload_dir();
+                        if ($uploadDir === null) {
                             $errors[] = 'Video yükleme klasörü oluşturulamadı.';
                         } else {
                             $fileName = 'video_' . bin2hex(random_bytes(6)) . '.' . $videoMap[$videoMime];
@@ -69,7 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             if (!move_uploaded_file($_FILES['video_file']['tmp_name'], $targetPath)) {
                                 $errors[] = 'Video yüklenirken hata oluştu.';
                             } else {
-                                $storagePath = 'uploads/media/' . $fileName;
+                                $storagePath = 'public/uploads/media/' . $fileName;
                             }
                         }
                     }
@@ -80,17 +92,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             if (!empty($_FILES['file_source']['tmp_name']) && is_uploaded_file($_FILES['file_source']['tmp_name'])) {
                 $fileMime = mime_content_type($_FILES['file_source']['tmp_name']);
-                $validMime = $type === 'image'
-                    ? ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/svg+xml']
-                    : ['application/pdf'];
+                $imageMap = [
+                    'image/png' => 'png',
+                    'image/jpeg' => 'jpg',
+                    'image/gif' => 'gif',
+                    'image/webp' => 'webp',
+                    'image/svg+xml' => 'svg',
+                ];
+                $documentMap = [
+                    'application/pdf' => 'pdf',
+                ];
+                $allowedMap = $type === 'image' ? $imageMap : $documentMap;
 
-                if (!in_array($fileMime, $validMime, true)) {
+                if (!array_key_exists($fileMime, $allowedMap)) {
                     $errors[] = 'Dosya formatı desteklenmiyor.';
                 } elseif ($_FILES['file_source']['size'] > 5 * 1024 * 1024) {
                     $errors[] = 'Dosya boyutu 5MB sınırını aşmamalıdır.';
                 } else {
-                    $binary = file_get_contents($_FILES['file_source']['tmp_name']);
-                    $source = sprintf('data:%s;base64,%s', $fileMime, base64_encode($binary));
+                    $uploadDir = ensure_media_upload_dir();
+                    if ($uploadDir === null) {
+                        $errors[] = 'Dosya yükleme klasörü oluşturulamadı.';
+                    } else {
+                        $prefix = $type === 'image' ? 'image_' : 'document_';
+                        $fileName = $prefix . bin2hex(random_bytes(6)) . '.' . $allowedMap[$fileMime];
+                        $targetPath = $uploadDir . '/' . $fileName;
+                        if (!move_uploaded_file($_FILES['file_source']['tmp_name'], $targetPath)) {
+                            $errors[] = 'Dosya yüklenirken hata oluştu.';
+                        } else {
+                            $storagePath = 'public/uploads/media/' . $fileName;
+                        }
+                    }
                 }
             } else {
                 $errors[] = 'Dosya yüklenmedi.';
@@ -101,7 +132,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $pdo->prepare('INSERT INTO media_items (title, type, source, storage_path, duration_seconds, position, expires_at) VALUES (:title, :type, :source, :storage, :duration, :position, :expires_at)');
             $stmt->bindValue(':title', $title);
             $stmt->bindValue(':type', $type);
-            if ($source !== null) {
+            if ($source !== null && $source !== '') {
                 $stmt->bindValue(':source', $source);
             } else {
                 $stmt->bindValue(':source', null, PDO::PARAM_NULL);
@@ -129,6 +160,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'delete') {
         $id = (int) ($_POST['id'] ?? 0);
         if ($id > 0) {
+            $fileStmt = $pdo->prepare('SELECT storage_path FROM media_items WHERE id = :id');
+            $fileStmt->execute(['id' => $id]);
+            $mediaRow = $fileStmt->fetch();
+            if ($mediaRow && !empty($mediaRow['storage_path'])) {
+                $path = __DIR__ . '/../' . ltrim($mediaRow['storage_path'], '/');
+                if (is_file($path)) {
+                    @unlink($path);
+                }
+            }
+
             $stmt = $pdo->prepare('DELETE FROM media_items WHERE id = :id');
             $stmt->execute(['id' => $id]);
             $_SESSION['flash'] = 'Medya silindi.';
@@ -139,6 +180,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $mediaItems = $pdo->query('SELECT id, title, type, source, storage_path, duration_seconds, expires_at FROM media_items ORDER BY position ASC, id ASC')->fetchAll();
+$mediaMimeMap = [
+    'mp4' => 'video/mp4',
+    'webm' => 'video/webm',
+    'ogv' => 'video/ogg',
+    'ogg' => 'video/ogg',
+    'mov' => 'video/quicktime',
+    'pdf' => 'application/pdf',
+    'png' => 'image/png',
+    'jpg' => 'image/jpeg',
+    'jpeg' => 'image/jpeg',
+    'gif' => 'image/gif',
+    'webp' => 'image/webp',
+    'svg' => 'image/svg+xml',
+];
+$mediaPreview = array_map(static function (array $row) use ($mediaMimeMap): array {
+    $previewSource = null;
+    $mime = null;
+    $storagePath = $row['storage_path'] ?? null;
+    $isLocal = !empty($storagePath);
+
+    if ($isLocal) {
+        $relative = ltrim($storagePath, '/');
+        $previewSource = asset_url($relative);
+        $extension = strtolower(pathinfo($relative, PATHINFO_EXTENSION));
+        if (isset($mediaMimeMap[$extension])) {
+            $mime = $mediaMimeMap[$extension];
+        }
+    } elseif (!empty($row['source'])) {
+        $previewSource = $row['source'];
+        if (preg_match('/^data:([^;]+);/i', $row['source'], $matches)) {
+            $mime = $matches[1];
+        }
+    }
+
+    return [
+        'id' => (int) $row['id'],
+        'title' => $row['title'],
+        'type' => $row['type'],
+        'duration' => (int) $row['duration_seconds'],
+        'expires_at' => $row['expires_at'],
+        'preview_source' => $previewSource,
+        'mime' => $mime,
+        'is_local' => $isLocal,
+        'storage_path' => $storagePath,
+        'raw_source' => $row['source'],
+    ];
+}, $mediaItems);
 ?>
 <!DOCTYPE html>
 <html lang="tr">
@@ -218,6 +306,60 @@ $mediaItems = $pdo->query('SELECT id, title, type, source, storage_path, duratio
             </form>
         </section>
 
+        <section class="card" style="margin-bottom: 2rem;">
+            <h2>Önizleme</h2>
+            <?php if (!$mediaPreview): ?>
+                <p>Henüz medya eklenmedi.</p>
+            <?php else: ?>
+                <div class="media-preview-grid">
+                    <?php foreach ($mediaPreview as $item): ?>
+                        <article class="media-preview-card">
+                            <div class="media-preview-frame">
+                                <?php if ($item['type'] === 'image'): ?>
+                                    <?php if ($item['preview_source']): ?>
+                                        <img src="<?php echo htmlspecialchars($item['preview_source'], ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8'); ?>">
+                                    <?php else: ?>
+                                        <div class="media-preview-placeholder">Önizleme yok</div>
+                                    <?php endif; ?>
+                                <?php elseif ($item['type'] === 'video'): ?>
+                                    <?php if ($item['is_local'] && $item['preview_source']): ?>
+                                        <video controls muted playsinline loop preload="metadata">
+                                            <source src="<?php echo htmlspecialchars($item['preview_source'], ENT_QUOTES, 'UTF-8'); ?>"<?php echo $item['mime'] ? ' type="' . htmlspecialchars($item['mime'], ENT_QUOTES, 'UTF-8') . '"' : ''; ?>>
+                                            Tarayıcınız bu videoyu oynatamıyor.
+                                        </video>
+                                    <?php elseif ($item['preview_source']): ?>
+                                        <iframe src="<?php echo htmlspecialchars($item['preview_source'], ENT_QUOTES, 'UTF-8'); ?>" title="<?php echo htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8'); ?>" allow="autoplay; encrypted-media" allowfullscreen loading="lazy"></iframe>
+                                    <?php else: ?>
+                                        <div class="media-preview-placeholder">Önizleme yok</div>
+                                    <?php endif; ?>
+                                <?php else: ?>
+                                    <?php if ($item['preview_source']): ?>
+                                        <iframe src="<?php echo htmlspecialchars($item['preview_source'], ENT_QUOTES, 'UTF-8'); ?>" title="<?php echo htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8'); ?>" loading="lazy"></iframe>
+                                    <?php else: ?>
+                                        <div class="media-preview-placeholder">Önizleme yok</div>
+                                    <?php endif; ?>
+                                <?php endif; ?>
+                            </div>
+                            <div class="media-preview-meta">
+                                <h3><?php echo htmlspecialchars($item['title'], ENT_QUOTES, 'UTF-8'); ?></h3>
+                                <p class="media-preview-details">
+                                    <span><?php echo strtoupper($item['type']); ?></span>
+                                    <span><?php echo (int) $item['duration']; ?> sn</span>
+                                    <span><?php echo $item['expires_at'] ? 'Bitiş: ' . htmlspecialchars($item['expires_at'], ENT_QUOTES, 'UTF-8') : 'Süresiz'; ?></span>
+                                </p>
+                                <?php if ($item['storage_path']): ?>
+                                    <?php $asset = asset_url(ltrim($item['storage_path'], '/')); ?>
+                                    <a class="media-preview-path" href="<?php echo htmlspecialchars($asset, ENT_QUOTES, 'UTF-8'); ?>" target="_blank" rel="noopener"><?php echo htmlspecialchars($item['storage_path'], ENT_QUOTES, 'UTF-8'); ?></a>
+                                <?php elseif ($item['type'] === 'video' && $item['raw_source']): ?>
+                                    <span class="media-preview-path">Harici video kaynağı</span>
+                                <?php endif; ?>
+                            </div>
+                        </article>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+        </section>
+
         <section class="card">
             <h2>Mevcut Medyalar</h2>
             <?php if (!$mediaItems): ?>
@@ -243,18 +385,17 @@ $mediaItems = $pdo->query('SELECT id, title, type, source, storage_path, duratio
                             <td><?php echo strtoupper($row['type']); ?></td>
                             <td><?php echo (int) $row['duration_seconds']; ?> sn</td>
                             <td>
-                                <?php if ($row['type'] === 'video'): ?>
-                                    <?php if (!empty($row['storage_path'])): ?>
-                                        <small>Yerel video</small>
-                                    <?php elseif (!empty($row['source'])): ?>
-                                        <a href="<?php echo htmlspecialchars($row['source'], ENT_QUOTES, 'UTF-8'); ?>" target="_blank">Bağlantı</a>
-                                    <?php else: ?>
-                                        <small>Kaynak tanımlı değil</small>
-                                    <?php endif; ?>
-                                <?php elseif ($row['type'] === 'image'): ?>
-                                    <small>Görsel yüklendi</small>
+                                <?php if (!empty($row['storage_path'])): ?>
+                                    <?php $asset = asset_url(ltrim($row['storage_path'], '/')); ?>
+                                    <a href="<?php echo htmlspecialchars($asset, ENT_QUOTES, 'UTF-8'); ?>" target="_blank" rel="noopener"><?php echo htmlspecialchars($row['storage_path'], ENT_QUOTES, 'UTF-8'); ?></a>
+                                <?php elseif ($row['type'] === 'video' && !empty($row['source'])): ?>
+                                    <a href="<?php echo htmlspecialchars($row['source'], ENT_QUOTES, 'UTF-8'); ?>" target="_blank" rel="noopener">Bağlantı</a>
+                                <?php elseif ($row['type'] === 'video'): ?>
+                                    <small>Kaynak tanımlı değil</small>
+                                <?php elseif (!empty($row['source'])): ?>
+                                    <small>Gömülü veri</small>
                                 <?php else: ?>
-                                    <small>PDF yüklendi</small>
+                                    <small>Kaynak tanımlı değil</small>
                                 <?php endif; ?>
                             </td>
                             <td><?php echo $row['expires_at'] ? htmlspecialchars($row['expires_at'], ENT_QUOTES, 'UTF-8') : 'Süresiz'; ?></td>

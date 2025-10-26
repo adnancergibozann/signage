@@ -21,6 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $label = trim($_POST['label'] ?? '');
         $start = trim($_POST['start_time'] ?? '');
         $end = trim($_POST['end_time'] ?? '');
+        $periodType = $_POST['period_type'] ?? 'lesson';
 
         if ($number <= 0) {
             $errors[] = 'Periyot numarası giriniz.';
@@ -31,15 +32,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($start === '' || $end === '') {
             $errors[] = 'Başlangıç ve bitiş saatleri zorunludur.';
         }
+        if (!in_array($periodType, ['lesson', 'break'], true)) {
+            $errors[] = 'Periyot türü ders veya teneffüs olmalıdır.';
+        }
 
         if (!$errors) {
-            $stmt = $pdo->prepare('INSERT INTO schedule_periods (period_number, label, start_time, end_time) VALUES (:number, :label, :start, :end)
-                ON DUPLICATE KEY UPDATE label = VALUES(label), start_time = VALUES(start_time), end_time = VALUES(end_time)');
+            $stmt = $pdo->prepare('INSERT INTO schedule_periods (period_number, label, start_time, end_time, period_type) VALUES (:number, :label, :start, :end, :type)
+                ON DUPLICATE KEY UPDATE label = VALUES(label), start_time = VALUES(start_time), end_time = VALUES(end_time), period_type = VALUES(period_type)');
             $stmt->execute([
                 'number' => $number,
                 'label' => $label,
                 'start' => $start,
                 'end' => $end,
+                'type' => $periodType,
             ]);
             $_SESSION['flash'] = 'Periyot kaydedildi.';
             header('Location: ' . route_url('admin/schedule.php'));
@@ -100,6 +105,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         if ($subject === '') {
             $errors[] = 'Ders adı giriniz.';
+        }
+
+        if (!$errors) {
+            $typeStmt = $pdo->prepare('SELECT period_type FROM schedule_periods WHERE period_number = :number LIMIT 1');
+            $typeStmt->execute(['number' => $periodNumber]);
+            $periodRow = $typeStmt->fetch();
+            if (!$periodRow) {
+                $errors[] = 'Seçilen periyot bulunamadı.';
+            } elseif ($periodRow['period_type'] !== 'lesson') {
+                $errors[] = 'Teneffüs periyotlarına ders atanamaz.';
+            }
         }
 
         if (!$errors) {
@@ -206,6 +222,13 @@ $weekdayShort = [
                     <label for="end_time">Bitiş</label>
                     <input type="time" id="end_time" name="end_time" required>
                 </div>
+                <div>
+                    <label for="period_type">Tür</label>
+                    <select id="period_type" name="period_type">
+                        <option value="lesson">Ders</option>
+                        <option value="break">Teneffüs</option>
+                    </select>
+                </div>
                 <div style="grid-column: 1 / -1;">
                     <button type="submit" class="button button-primary">Kaydet</button>
                 </div>
@@ -217,6 +240,7 @@ $weekdayShort = [
                             <th>No</th>
                             <th>Etiket</th>
                             <th>Saat</th>
+                            <th>Tür</th>
                             <th>Sil</th>
                         </tr>
                     </thead>
@@ -226,6 +250,7 @@ $weekdayShort = [
                             <td><?php echo (int) $period['period']; ?></td>
                             <td><?php echo htmlspecialchars($period['label'], ENT_QUOTES, 'UTF-8'); ?></td>
                             <td><?php echo htmlspecialchars(substr($period['start_time'], 0, 5) . ' - ' . substr($period['end_time'], 0, 5), ENT_QUOTES, 'UTF-8'); ?></td>
+                            <td><?php echo $period['type'] === 'break' ? 'Teneffüs' : 'Ders'; ?></td>
                             <td>
                                 <form method="post" onsubmit="return confirm('Periyot silinecek. Devam?');">
                                     <input type="hidden" name="action" value="delete_period">
@@ -313,6 +338,7 @@ $weekdayShort = [
                     <select name="period_number" id="entry_period" required>
                         <option value="">Seçiniz</option>
                         <?php foreach ($periods as $period): ?>
+                            <?php if ($period['type'] !== 'lesson') { continue; } ?>
                             <option value="<?php echo (int) $period['period']; ?>"><?php echo htmlspecialchars($period['label'], ENT_QUOTES, 'UTF-8'); ?></option>
                         <?php endforeach; ?>
                     </select>
@@ -350,12 +376,14 @@ $weekdayShort = [
                             </thead>
                             <tbody>
                             <?php foreach ($periods as $period): ?>
-                                <tr>
+                                <tr class="<?php echo $period['type'] === 'break' ? 'row-break' : ''; ?>">
                                     <td><?php echo htmlspecialchars($period['label'], ENT_QUOTES, 'UTF-8'); ?><br><small><?php echo htmlspecialchars(substr($period['start_time'], 0, 5) . ' - ' . substr($period['end_time'], 0, 5), ENT_QUOTES, 'UTF-8'); ?></small></td>
                                     <?php for ($day = 1; $day <= 7; $day++): ?>
                                         <?php $entry = $slide['entries'][$day][$period['period']] ?? null; ?>
-                                        <td>
-                                            <?php if ($entry): ?>
+                                        <td class="<?php echo $period['type'] === 'break' ? 'row-break' : ''; ?>">
+                                            <?php if ($period['type'] === 'break'): ?>
+                                                <span style="color:rgba(255,255,255,0.7); font-weight:600;">Teneffüs</span>
+                                            <?php elseif ($entry): ?>
                                                 <strong><?php echo htmlspecialchars($entry['subject'], ENT_QUOTES, 'UTF-8'); ?></strong>
                                                 <?php if (!empty($entry['teacher'])): ?>
                                                     <div style="font-size:0.85rem;color:rgba(255,255,255,0.7);">

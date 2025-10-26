@@ -3,7 +3,13 @@
 require_once __DIR__ . '/includes/signage.php';
 
 $data = get_signage_data();
-$messages = $data['ticker'];
+$messages = array_values(array_filter(
+    $data['ticker'],
+    static function (array $message): bool {
+        return trim((string) ($message['body'] ?? '')) !== '';
+    }
+));
+
 $marqueeSpeed = $messages ? max(array_column($messages, 'speed')) : 30;
 $marqueeSpeed = max(5, min(60, (int) $marqueeSpeed));
 $settings = $data['settings'];
@@ -20,6 +26,17 @@ $scheduleSlides = $data['schedule'];
 $countdowns = $data['countdowns'];
 $nextPeriod = $data['nextPeriod'];
 $periods = $data['periods'];
+$periodTimeline = array_map(
+    static function (array $period): array {
+        return [
+            'label' => $period['label'],
+            'start_time' => substr($period['start_time'], 0, 5),
+            'end_time' => substr($period['end_time'], 0, 5),
+            'type' => $period['type'] ?? 'lesson',
+        ];
+    },
+    $periods
+);
 $newsItems = $data['news'];
 
 function esc_html(?string $value): string
@@ -53,7 +70,7 @@ function esc_html(?string $value): string
 
     <section class="module next-period" data-next-change="<?php echo esc_html($nextPeriod['next_change_at'] ?? ''); ?>" data-state="<?php echo esc_html($nextPeriod['state']); ?>">
         <div class="next-period-header">
-            <span class="next-period-icon" aria-hidden="true">
+            <span class="next-period-icon" data-role="next-period-icon" aria-hidden="true">
                 <?php
                 $stateIcons = [
                     'lesson' => '📚',
@@ -67,22 +84,31 @@ function esc_html(?string $value): string
             </span>
             <div>
                 <h2>Sonraki Ders/Teneffüs</h2>
-                <p class="next-period-status"><?php echo esc_html($nextPeriod['label']); ?></p>
+                <p class="next-period-status" data-role="next-period-label"><?php echo esc_html($nextPeriod['label']); ?></p>
             </div>
         </div>
-        <?php if (!empty($nextPeriod['timeLeft'])): ?>
-            <div class="next-period-countdown">
-                <span class="countdown-value" data-role="next-period-minutes"><?php echo (int) ($nextPeriod['timeLeft']['minutes'] ?? 0); ?></span>
-                <span class="countdown-label">Dakika</span>
-                <span class="countdown-separator">:</span>
-                <span class="countdown-value" data-role="next-period-seconds"><?php echo str_pad((string) ($nextPeriod['timeLeft']['seconds'] ?? 0), 2, '0', STR_PAD_LEFT); ?></span>
-                <span class="countdown-label">Saniye</span>
-            </div>
-        <?php elseif (!empty($nextPeriod['message'])): ?>
-            <p><?php echo esc_html($nextPeriod['message']); ?></p>
-        <?php endif; ?>
+        <div class="next-period-countdown" data-role="next-period-countdown"<?php echo empty($nextPeriod['timeLeft']) ? ' hidden' : ''; ?>>
+            <span class="countdown-value" data-role="next-period-minutes"><?php echo (int) ($nextPeriod['timeLeft']['minutes'] ?? 0); ?></span>
+            <span class="countdown-label">Dakika</span>
+            <span class="countdown-separator">:</span>
+            <span class="countdown-value" data-role="next-period-seconds"><?php echo str_pad((string) ($nextPeriod['timeLeft']['seconds'] ?? 0), 2, '0', STR_PAD_LEFT); ?></span>
+            <span class="countdown-label">Saniye</span>
+        </div>
+        <p class="next-period-message" data-role="next-period-message"<?php echo empty($nextPeriod['message']) ? ' hidden' : ''; ?>><?php echo esc_html($nextPeriod['message'] ?? ''); ?></p>
         <?php if (!empty($nextPeriod['next_period'])): ?>
-            <p class="next-period-meta">Sıradaki: <strong><?php echo esc_html($nextPeriod['next_period']['label']); ?></strong> (<?php echo esc_html($nextPeriod['next_period']['starts_at']); ?>)</p>
+            <?php
+            $upNext = $nextPeriod['next_period'];
+            $upNextLabel = $upNext['label'];
+            if (($upNext['type'] ?? '') === 'break') {
+                $upNextLabel .= ' (Teneffüs)';
+            }
+            ?>
+            <p class="next-period-meta" data-role="next-period-meta">
+                Sıradaki: <strong data-role="next-period-meta-label"><?php echo esc_html($upNextLabel); ?></strong>
+                (<span data-role="next-period-meta-time"><?php echo esc_html($upNext['starts_at']); ?></span>)
+            </p>
+        <?php else: ?>
+            <p class="next-period-meta" data-role="next-period-meta" hidden>Sıradaki: <strong data-role="next-period-meta-label"></strong> (<span data-role="next-period-meta-time"></span>)</p>
         <?php endif; ?>
     </section>
 
@@ -111,26 +137,30 @@ function esc_html(?string $value): string
         <?php endif; ?>
     </section>
 
-    <section class="module news-module">
+    <section class="module news-module" data-slider="news" data-default-duration="12">
         <h2>Güncel Haberler</h2>
         <?php if (!$newsItems): ?>
             <p class="module-placeholder">Haber bulunamadı.</p>
         <?php else: ?>
-            <ul class="news-list">
-                <?php foreach ($newsItems as $news): ?>
-                    <li class="news-card">
-                        <?php if (!empty($news['image_url'])): ?>
+            <div class="news-slider">
+                <?php foreach ($newsItems as $index => $news): ?>
+                    <?php
+                    $hasThumb = !empty($news['image_url']);
+                    $cardClasses = 'news-card' . ($index === 0 ? ' active' : '') . (!$hasThumb ? ' no-thumb' : '');
+                    ?>
+                    <article class="<?php echo $cardClasses; ?>" data-duration="12">
+                        <?php if ($hasThumb): ?>
                             <img src="<?php echo esc_html($news['image_url']); ?>" alt="<?php echo esc_html($news['title']); ?>" class="news-thumb">
                         <?php endif; ?>
-                        <div>
+                        <div class="news-content">
                             <p class="news-title"><?php echo esc_html($news['title']); ?></p>
                             <?php if (!empty($news['summary'])): ?>
                                 <p class="news-summary"><?php echo esc_html($news['summary']); ?></p>
                             <?php endif; ?>
                         </div>
-                    </li>
+                    </article>
                 <?php endforeach; ?>
-            </ul>
+            </div>
         <?php endif; ?>
     </section>
 
@@ -148,7 +178,8 @@ function esc_html(?string $value): string
                                 <img src="<?php echo esc_html($item['source']); ?>" alt="<?php echo esc_html($item['title']); ?>">
                             <?php elseif ($item['type'] === 'video'): ?>
                                 <?php if (!empty($item['is_local'])): ?>
-                                    <video src="<?php echo esc_html($item['source']); ?>" title="<?php echo esc_html($item['title']); ?>" autoplay muted loop playsinline controlslist="nodownload">
+                                    <video title="<?php echo esc_html($item['title']); ?>" autoplay muted loop playsinline preload="auto">
+                                        <source src="<?php echo esc_html($item['source']); ?>"<?php echo !empty($item['mime']) ? ' type="' . esc_html($item['mime']) . '"' : ''; ?>>
                                         Videonuz tarayıcı tarafından desteklenmiyor.
                                     </video>
                                 <?php else: ?>
@@ -227,15 +258,17 @@ function esc_html(?string $value): string
                             </thead>
                             <tbody>
                             <?php foreach ($periods as $period): ?>
-                                <tr>
+                                <tr class="<?php echo $period['type'] === 'break' ? 'schedule-row-break' : ''; ?>">
                                     <td>
                                         <span class="period-label"><?php echo esc_html($period['label']); ?></span>
                                         <span class="period-time"><?php echo esc_html(substr($period['start_time'], 0, 5)); ?> - <?php echo esc_html(substr($period['end_time'], 0, 5)); ?></span>
                                     </td>
                                     <?php for ($day = 1; $day <= 7; $day++): ?>
                                         <?php $entry = $slide['entries'][$day][$period['period']] ?? null; ?>
-                                        <td>
-                                            <?php if ($entry): ?>
+                                        <td class="<?php echo $period['type'] === 'break' ? 'schedule-cell-break' : ''; ?>">
+                                            <?php if ($period['type'] === 'break'): ?>
+                                                <span class="schedule-break">Teneffüs</span>
+                                            <?php elseif ($entry): ?>
                                                 <strong><?php echo esc_html($entry['subject']); ?></strong>
                                                 <?php if (!empty($entry['teacher'])): ?>
                                                     <span class="schedule-teacher"><?php echo esc_html($entry['teacher']); ?></span>
@@ -288,11 +321,10 @@ function esc_html(?string $value): string
             <div class="marquee">
                 <div class="marquee-track">
                     <?php foreach (array_merge($messages, $messages) as $message): ?>
+                        <?php $detail = trim((string) ($message['body'] ?? '')); ?>
+                        <?php if ($detail === '') { continue; } ?>
                         <div class="marquee-item" style="background: <?php echo esc_html($message['background_color']); ?>; color: <?php echo esc_html($message['text_color']); ?>;">
-                            <div class="marquee-title"><?php echo esc_html($message['title']); ?></div>
-                            <?php if (!empty($message['body'])): ?>
-                                <div class="marquee-body"><?php echo esc_html($message['body']); ?></div>
-                            <?php endif; ?>
+                            <div class="marquee-text"><?php echo esc_html($detail); ?></div>
                         </div>
                     <?php endforeach; ?>
                 </div>
@@ -303,6 +335,8 @@ function esc_html(?string $value): string
 <script>
     window.__SIGNAGE__ = {
         scheduleDuration: 10000,
+        periods: <?php echo json_encode($periodTimeline, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
+        nextPeriod: <?php echo json_encode($nextPeriod, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>
     };
 </script>
 <script src="<?php echo htmlspecialchars(asset_url('assets/signage.js'), ENT_QUOTES, 'UTF-8'); ?>" defer></script>

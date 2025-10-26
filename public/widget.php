@@ -3,7 +3,12 @@ require_once __DIR__ . '/../includes/helpers.php';
 require_once __DIR__ . '/../includes/messages.php';
 require_once __DIR__ . '/../includes/signage.php';
 
-$messages = fetch_messages();
+$messages = array_values(array_filter(
+    fetch_messages(),
+    static function (array $message): bool {
+        return trim((string) ($message['body'] ?? '')) !== '';
+    }
+));
 $speed = $messages ? max(array_column($messages, 'speed')) : 30;
 $speed = max(5, min(60, (int) $speed));
 $settings = get_signage_settings();
@@ -40,11 +45,10 @@ header('Content-Type: text/html; charset=utf-8');
             <div class="marquee">
                 <div class="marquee-track">
                     <?php foreach (array_merge($messages, $messages) as $message): ?>
+                        <?php $detail = trim((string) ($message['body'] ?? '')); ?>
+                        <?php if ($detail === '') { continue; } ?>
                         <div class="marquee-item" style="background: <?php echo $message['background_color']; ?>; color: <?php echo $message['text_color']; ?>;">
-                            <div class="marquee-title"><?php echo htmlspecialchars($message['title'], ENT_QUOTES, 'UTF-8'); ?></div>
-                            <?php if (!empty($message['body'])): ?>
-                                <div class="marquee-body"><?php echo htmlspecialchars($message['body'], ENT_QUOTES, 'UTF-8'); ?></div>
-                            <?php endif; ?>
+                            <div class="marquee-text"><?php echo htmlspecialchars($detail, ENT_QUOTES, 'UTF-8'); ?></div>
                         </div>
                     <?php endforeach; ?>
                 </div>
