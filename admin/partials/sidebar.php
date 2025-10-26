@@ -12,6 +12,7 @@ $navItems = [
     'weather' => ['label' => 'Hava Durumu', 'href' => route_url('admin/weather.php')],
     'news' => ['label' => 'Haberler', 'href' => route_url('admin/news.php')],
     'countdowns' => ['label' => 'Geri Sayımlar', 'href' => route_url('admin/countdowns.php')],
+    'users' => ['label' => 'Kullanıcılar', 'href' => route_url('admin/users.php')],
 ];
 ?>
 <aside class="sidebar">

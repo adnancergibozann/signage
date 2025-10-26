@@ -177,6 +177,8 @@ function fetch_schedule_periods(): array
             'start_time' => $row['start_time'],
             'end_time' => $row['end_time'],
             'type' => $row['period_type'] ?? 'lesson',
+            'start_label' => substr($row['start_time'], 0, 5),
+            'end_label' => substr($row['end_time'], 0, 5),
         ];
     }
 
@@ -295,28 +297,40 @@ function compute_next_period_state(array $periods): array
         return [
             'state' => 'unconfigured',
             'label' => 'Ders saatleri tanımlanmadı',
+            'current_period' => null,
+            'next_period' => null,
         ];
     }
 
     $timezone = new \DateTimeZone(date_default_timezone_get() ?: 'Europe/Istanbul');
     $now = new \DateTimeImmutable('now', $timezone);
 
-    $dayOfWeek = (int) $now->format('N');
-    if ($dayOfWeek >= 6) {
-        return [
-            'state' => 'after-school',
-            'label' => 'Hafta Sonu',
-            'message' => 'Okulumuz tatilde',
-        ];
-    }
-
     $timeline = [];
     foreach ($periods as $period) {
+        $start = to_datetime($period['start_time'], $timezone, $now);
+        $end = to_datetime($period['end_time'], $timezone, $now);
+
+        if ($end <= $start) {
+            continue;
+        }
+
         $timeline[] = [
             'label' => $period['label'],
             'type' => $period['type'] ?? 'lesson',
-            'start' => to_datetime($period['start_time'], $timezone, $now),
-            'end' => to_datetime($period['end_time'], $timezone, $now),
+            'start' => $start,
+            'end' => $end,
+            'start_label' => $period['start_label'] ?? $start->format('H:i'),
+            'end_label' => $period['end_label'] ?? $end->format('H:i'),
+            'period' => $period['period'] ?? null,
+        ];
+    }
+
+    if (!$timeline) {
+        return [
+            'state' => 'unconfigured',
+            'label' => 'Ders saatleri tanımlanmadı',
+            'current_period' => null,
+            'next_period' => null,
         ];
     }
 
@@ -330,18 +344,21 @@ function compute_next_period_state(array $periods): array
     if ($now < $first['start']) {
         return [
             'state' => 'before-school',
-            'label' => 'Okulumuz Açılıyor',
+            'label' => headline_for_next_period('before-school'),
             'timeLeft' => diff_to_array($now->diff($first['start'])),
             'next_change_at' => $first['start']->format(\DateTimeInterface::ATOM),
             'next_period' => format_next_period_context($first),
+            'current_period' => null,
         ];
     }
 
     if ($now >= $last['end']) {
         return [
             'state' => 'after-school',
-            'label' => 'Okulumuz Kapandı',
+            'label' => headline_for_next_period('after-school'),
             'message' => 'Yarın görüşmek üzere',
+            'current_period' => null,
+            'next_period' => null,
         ];
     }
 
@@ -349,28 +366,38 @@ function compute_next_period_state(array $periods): array
         $nextSlot = $timeline[$index + 1] ?? null;
 
         if ($now >= $slot['start'] && $now < $slot['end']) {
-            $state = $slot['type'] === 'break' ? 'break' : 'lesson';
-            $label = $slot['label'] ?: ($state === 'break' ? 'Teneffüs' : 'Ders');
+            $state = ($slot['type'] ?? 'lesson') === 'break' ? 'break' : 'lesson';
+            $targetType = $state === 'lesson' ? 'break' : 'lesson';
+            $targetSlot = find_next_slot_by_type($timeline, $index, $targetType) ?? $nextSlot;
+            $targetMoment = $targetSlot['start'] ?? $slot['end'];
 
             return [
                 'state' => $state,
-                'label' => $label,
-                'timeLeft' => diff_to_array($now->diff($slot['end'])),
-                'next_change_at' => $slot['end']->format(\DateTimeInterface::ATOM),
-                'next_period' => $nextSlot ? format_next_period_context($nextSlot) : null,
+                'label' => headline_for_next_period($state),
+                'timeLeft' => diff_to_array($now->diff($targetMoment)),
+                'next_change_at' => $targetMoment->format(\DateTimeInterface::ATOM),
+                'current_period' => format_current_period_context($slot),
+                'next_period' => $targetSlot ? format_next_period_context($targetSlot) : null,
             ];
         }
 
         if ($now < $slot['start']) {
-            // we are in a gap between slots; treat as break until the next one begins
-            $state = 'break';
-            $label = 'Teneffüs';
+            $previousSlot = $timeline[$index - 1] ?? null;
+            $gapSlot = [
+                'label' => 'Teneffüs',
+                'type' => 'break',
+                'start' => $previousSlot['end'] ?? $now,
+                'end' => $slot['start'],
+                'start_label' => $previousSlot['end_label'] ?? $now->format('H:i'),
+                'end_label' => $slot['start_label'],
+            ];
 
             return [
-                'state' => $state,
-                'label' => $label,
+                'state' => 'break',
+                'label' => headline_for_next_period('break'),
                 'timeLeft' => diff_to_array($now->diff($slot['start'])),
                 'next_change_at' => $slot['start']->format(\DateTimeInterface::ATOM),
+                'current_period' => format_current_period_context($gapSlot),
                 'next_period' => format_next_period_context($slot),
             ];
         }
@@ -378,22 +405,82 @@ function compute_next_period_state(array $periods): array
 
     return [
         'state' => 'after-school',
-        'label' => 'Okulumuz Kapandı',
+        'label' => headline_for_next_period('after-school'),
         'message' => 'Yarın görüşmek üzere',
+        'current_period' => null,
+        'next_period' => null,
+    ];
+}
+
+function headline_for_next_period(string $state): string
+{
+    return match ($state) {
+        'lesson' => 'Teneffüse Kalan Süre',
+        'break' => 'Derse Kalan Süre',
+        'before-school' => 'İlk Derse Kalan Süre',
+        'after-school' => 'Okulumuz Kapandı',
+        'unconfigured' => 'Ders saatleri tanımlanmadı',
+        default => 'Ders Durumu',
+    };
+}
+
+function find_next_slot_by_type(array $timeline, int $index, string $type): ?array
+{
+    $count = count($timeline);
+    for ($i = $index + 1; $i < $count; $i++) {
+        $slot = $timeline[$i];
+        if (($slot['type'] ?? 'lesson') === $type) {
+            return $slot;
+        }
+    }
+
+    return null;
+}
+
+function format_current_period_context(array $slot): array
+{
+    $type = $slot['type'] ?? 'lesson';
+    $label = $slot['label'] ?? '';
+
+    if ($label === '') {
+        $label = $type === 'break' ? 'Teneffüs' : 'Ders';
+    }
+
+    $start = $slot['start_label'] ?? null;
+    if ($start === null && isset($slot['start']) && $slot['start'] instanceof \DateTimeInterface) {
+        $start = $slot['start']->format('H:i');
+    }
+
+    $end = $slot['end_label'] ?? null;
+    if ($end === null && isset($slot['end']) && $slot['end'] instanceof \DateTimeInterface) {
+        $end = $slot['end']->format('H:i');
+    }
+
+    return [
+        'label' => $label,
+        'type' => $type,
+        'start_time' => $start,
+        'end_time' => $end,
     ];
 }
 
 function format_next_period_context(array $period): array
 {
+    $type = $period['type'] ?? 'lesson';
     $label = $period['label'] ?? '';
-    if ($label === '' && (($period['type'] ?? '') === 'break')) {
+    if ($label === '' && $type === 'break') {
         $label = 'Teneffüs';
+    }
+
+    $start = $period['start_label'] ?? null;
+    if ($start === null && isset($period['start']) && $period['start'] instanceof \DateTimeInterface) {
+        $start = $period['start']->format('H:i');
     }
 
     return [
         'label' => $label,
-        'starts_at' => $period['start']->format('H:i'),
-        'type' => $period['type'] ?? 'lesson',
+        'starts_at' => $start ?? '',
+        'type' => $type,
     ];
 }
 

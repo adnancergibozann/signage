@@ -92,6 +92,17 @@
     font-size: 1.4em;
 }
 
+.next-period-status {
+    margin-top: 0.35em;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.next-period-current {
+    margin-top: 0.15em;
+    color: rgba(255, 255, 255, 0.7);
+}
+
 .next-period-countdown .countdown-value {
     font-size: 2.2em;
 }
@@ -442,6 +453,12 @@
     border-radius: 18px;
     overflow: hidden;
     border: var(--ticker-border-width, 2px) solid rgba(255, 212, 0, 0.35);
+    display: flex;
+    align-items: center;
+}
+
+.ticker-module .marquee {
+    width: 100%;
 }
 
 @media (max-width: 1440px) {

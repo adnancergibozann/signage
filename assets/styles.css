@@ -43,6 +43,21 @@ a {
     color: var(--color-primary);
 }
 
+.auth-logo {
+    display: block;
+    width: 160px;
+    max-width: 60%;
+    margin: 0 auto 1rem;
+    object-fit: contain;
+}
+
+.auth-organization {
+    text-align: center;
+    margin-bottom: 1.5rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
 .card {
     background: rgba(10, 10, 10, 0.9);
     padding: 2rem;
@@ -214,11 +229,16 @@ textarea:focus {
     background: var(--color-dark);
     border: var(--ticker-border-width, 2px) solid var(--color-primary);
     font-family: var(--ticker-font-family, inherit);
+    display: flex;
+    align-items: center;
+    height: 100%;
 }
 
 .marquee-track {
     display: flex;
+    align-items: center;
     width: max-content;
+    height: 100%;
     animation: marquee linear infinite;
 }
 
@@ -227,12 +247,16 @@ textarea:focus {
     align-items: center;
     padding: 1.5rem 2.5rem;
     min-width: 300px;
+    height: 100%;
 }
 
 .marquee-text {
     font-size: var(--ticker-font-size, 1.5rem);
     font-weight: 700;
     white-space: nowrap;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
 }
 
 @keyframes marquee {

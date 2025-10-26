@@ -133,6 +133,7 @@
 
         const iconEl = section.querySelector('[data-role="next-period-icon"]');
         const labelEl = section.querySelector('[data-role="next-period-label"]');
+        const currentEl = section.querySelector('[data-role="next-period-current"]');
         const countdownEl = section.querySelector('[data-role="next-period-countdown"]');
         const minutesEl = section.querySelector('[data-role="next-period-minutes"]');
         const secondsEl = section.querySelector('[data-role="next-period-seconds"]');
@@ -175,18 +176,26 @@
             return result;
         };
 
+        const formatTime = date => date.toLocaleTimeString('tr-TR', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+        });
+
         const buildTimeline = (referenceDate) => periods
             .map(period => {
                 const start = parsePeriodTime(period.start_time, referenceDate);
                 const end = parsePeriodTime(period.end_time, referenceDate);
-                if (!start || !end) {
+                if (!start || !end || end <= start) {
                     return null;
                 }
                 return {
                     label: period.label || '',
                     type: period.type || 'lesson',
                     start,
-                    end
+                    end,
+                    startLabel: period.start_time || formatTime(start),
+                    endLabel: period.end_time || formatTime(end)
                 };
             })
             .filter(Boolean)
@@ -201,41 +210,58 @@
             };
         };
 
-        const formatLabel = slot => slot.label || (slot.type === 'break' ? 'Teneffüs' : 'Ders');
+        const labelForSlot = slot => slot.label || (slot.type === 'break' ? 'Teneffüs' : 'Ders');
 
-        const formatTime = date => date.toLocaleTimeString('tr-TR', {
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false
+        const formatCurrent = slot => ({
+            label: labelForSlot(slot),
+            type: slot.type,
+            start_time: slot.startLabel || formatTime(slot.start),
+            end_time: slot.endLabel || formatTime(slot.end)
         });
 
         const formatNext = slot => ({
-            label: formatLabel(slot),
-            starts_at: formatTime(slot.start),
+            label: labelForSlot(slot),
+            starts_at: slot.startLabel || formatTime(slot.start),
             type: slot.type
         });
 
-        const computeState = (now) => {
-            const weekday = now.getDay();
-            if (weekday === 0 || weekday === 6) {
-                return {
-                    state: 'after-school',
-                    label: 'Hafta Sonu',
-                    message: 'Okulumuz tatilde',
-                    timeLeft: null,
-                    nextChangeAt: null,
-                    nextPeriod: null
-                };
+        const findNextOfType = (timeline, fromIndex, type) => {
+            for (let i = fromIndex + 1; i < timeline.length; i += 1) {
+                const candidate = timeline[i];
+                if ((candidate.type || 'lesson') === type) {
+                    return candidate;
+                }
             }
+            return null;
+        };
 
+        const headlineForState = (state) => {
+            switch (state) {
+                case 'lesson':
+                    return 'Teneffüse Kalan Süre';
+                case 'break':
+                    return 'Derse Kalan Süre';
+                case 'before-school':
+                    return 'İlk Derse Kalan Süre';
+                case 'after-school':
+                    return 'Okulumuz Kapandı';
+                case 'unconfigured':
+                    return 'Ders saatleri tanımlanmadı';
+                default:
+                    return 'Ders Durumu';
+            }
+        };
+
+        const computeState = (now) => {
             const timeline = buildTimeline(now);
             if (!timeline.length) {
                 return {
                     state: 'unconfigured',
-                    label: 'Ders saatleri tanımlanmadı',
+                    label: headlineForState('unconfigured'),
                     message: '',
                     timeLeft: null,
                     nextChangeAt: null,
+                    currentPeriod: null,
                     nextPeriod: null
                 };
             }
@@ -246,10 +272,11 @@
             if (now < first.start) {
                 return {
                     state: 'before-school',
-                    label: 'Okulumuz Açılıyor',
+                    label: headlineForState('before-school'),
                     message: '',
                     timeLeft: diffParts(first.start, now),
                     nextChangeAt: first.start,
+                    currentPeriod: null,
                     nextPeriod: formatNext(first)
                 };
             }
@@ -257,10 +284,11 @@
             if (now >= last.end) {
                 return {
                     state: 'after-school',
-                    label: 'Okulumuz Kapandı',
+                    label: headlineForState('after-school'),
                     message: 'Yarın görüşmek üzere',
                     timeLeft: null,
                     nextChangeAt: null,
+                    currentPeriod: null,
                     nextPeriod: null
                 };
             }
@@ -270,24 +298,41 @@
                 const nextSlot = timeline[i + 1] || null;
 
                 if (now >= slot.start && now < slot.end) {
-                    const state = slot.type === 'break' ? 'break' : 'lesson';
+                    const state = (slot.type || 'lesson') === 'break' ? 'break' : 'lesson';
+                    const targetType = state === 'lesson' ? 'break' : 'lesson';
+                    const targetSlot = findNextOfType(timeline, i, targetType) || nextSlot;
+                    const targetMoment = targetSlot ? targetSlot.start : slot.end;
+
                     return {
                         state,
-                        label: formatLabel(slot),
+                        label: headlineForState(state),
                         message: '',
-                        timeLeft: diffParts(slot.end, now),
-                        nextChangeAt: slot.end,
-                        nextPeriod: nextSlot ? formatNext(nextSlot) : null
+                        timeLeft: diffParts(targetMoment, now),
+                        nextChangeAt: targetMoment,
+                        currentPeriod: formatCurrent(slot),
+                        nextPeriod: targetSlot ? formatNext(targetSlot) : null
                     };
                 }
 
                 if (now < slot.start) {
+                    const prevSlot = timeline[i - 1] || null;
+                    const gapStartLabel = prevSlot ? (prevSlot.endLabel || formatTime(prevSlot.end)) : formatTime(now);
+                    const gapSlot = {
+                        label: 'Teneffüs',
+                        type: 'break',
+                        start: prevSlot ? prevSlot.end : now,
+                        end: slot.start,
+                        startLabel: gapStartLabel,
+                        endLabel: slot.startLabel || formatTime(slot.start)
+                    };
+
                     return {
                         state: 'break',
-                        label: 'Teneffüs',
+                        label: headlineForState('break'),
                         message: '',
                         timeLeft: diffParts(slot.start, now),
                         nextChangeAt: slot.start,
+                        currentPeriod: formatCurrent(gapSlot),
                         nextPeriod: formatNext(slot)
                     };
                 }
@@ -295,10 +340,11 @@
 
             return {
                 state: 'after-school',
-                label: 'Okulumuz Kapandı',
+                label: headlineForState('after-school'),
                 message: 'Yarın görüşmek üzere',
                 timeLeft: null,
                 nextChangeAt: null,
+                currentPeriod: null,
                 nextPeriod: null
             };
         };
@@ -322,6 +368,14 @@
                     type: raw.next_period.type || 'lesson'
                 }
                 : null;
+            const currentPeriod = raw.current_period && typeof raw.current_period === 'object'
+                ? {
+                    label: raw.current_period.label || '',
+                    type: raw.current_period.type || 'lesson',
+                    start_time: raw.current_period.start_time || '',
+                    end_time: raw.current_period.end_time || ''
+                }
+                : null;
 
             return {
                 state: raw.state || 'unconfigured',
@@ -329,7 +383,8 @@
                 message: raw.message || '',
                 timeLeft,
                 nextChangeAt,
-                nextPeriod
+                nextPeriod,
+                currentPeriod
             };
         };
 
@@ -353,6 +408,35 @@
                 labelEl.textContent = state.label || '';
             }
 
+            if (currentEl) {
+                if (state.currentPeriod) {
+                    const label = (state.currentPeriod.label || '').trim();
+                    const startTime = (state.currentPeriod.start_time || '').trim();
+                    const endTime = (state.currentPeriod.end_time || '').trim();
+                    const parts = [];
+                    if (label) {
+                        parts.push(label);
+                    }
+                    let range = '';
+                    if (startTime && endTime) {
+                        range = `${startTime} - ${endTime}`;
+                    } else if (startTime) {
+                        range = startTime;
+                    } else if (endTime) {
+                        range = endTime;
+                    }
+                    if (range) {
+                        parts.push(`(${range})`);
+                    }
+                    const summary = parts.length ? `Şu an: ${parts.join(' ')}` : '';
+                    currentEl.textContent = summary;
+                    setHidden(currentEl, summary === '');
+                } else {
+                    currentEl.textContent = '';
+                    setHidden(currentEl, true);
+                }
+            }
+
             if (messageEl) {
                 messageEl.textContent = state.message || '';
             }
@@ -361,12 +445,22 @@
             if (minutesEl && secondsEl && state.timeLeft) {
                 minutesEl.textContent = String(state.timeLeft.minutes);
                 secondsEl.textContent = String(state.timeLeft.seconds).padStart(2, '0');
+            } else if (minutesEl && secondsEl) {
+                minutesEl.textContent = '0';
+                secondsEl.textContent = '00';
             }
             setHidden(countdownEl, !state.timeLeft);
 
             if (state.nextPeriod && metaLabelEl && metaTimeEl) {
                 metaLabelEl.textContent = state.nextPeriod.label || '';
                 metaTimeEl.textContent = state.nextPeriod.starts_at || '';
+            } else {
+                if (metaLabelEl) {
+                    metaLabelEl.textContent = '';
+                }
+                if (metaTimeEl) {
+                    metaTimeEl.textContent = '';
+                }
             }
             setHidden(metaEl, !state.nextPeriod);
         };

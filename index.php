@@ -29,16 +29,49 @@ $nextPeriod = $data['nextPeriod'];
 $periods = $data['periods'];
 $periodTimeline = array_map(
     static function (array $period): array {
+        $start = $period['start_label'] ?? substr($period['start_time'], 0, 5);
+        $end = $period['end_label'] ?? substr($period['end_time'], 0, 5);
+
         return [
+            'period' => $period['period'],
             'label' => $period['label'],
-            'start_time' => substr($period['start_time'], 0, 5),
-            'end_time' => substr($period['end_time'], 0, 5),
+            'start_time' => $start,
+            'end_time' => $end,
             'type' => $period['type'] ?? 'lesson',
         ];
     },
     $periods
 );
 $newsItems = $data['news'];
+$currentPeriod = $nextPeriod['current_period'] ?? null;
+$currentSummary = '';
+if (is_array($currentPeriod)) {
+    $label = trim((string) ($currentPeriod['label'] ?? ''));
+    $startTime = trim((string) ($currentPeriod['start_time'] ?? ''));
+    $endTime = trim((string) ($currentPeriod['end_time'] ?? ''));
+
+    $parts = [];
+    if ($label !== '') {
+        $parts[] = $label;
+    }
+
+    $range = '';
+    if ($startTime !== '' && $endTime !== '') {
+        $range = $startTime . ' - ' . $endTime;
+    } elseif ($startTime !== '') {
+        $range = $startTime;
+    } elseif ($endTime !== '') {
+        $range = $endTime;
+    }
+
+    if ($range !== '') {
+        $parts[] = '(' . $range . ')';
+    }
+
+    if ($parts) {
+        $currentSummary = 'Şu an: ' . implode(' ', $parts);
+    }
+}
 
 function esc_html(?string $value): string
 {
@@ -90,7 +123,12 @@ function module_style_attr(array $layout, string $key): string
             </span>
             <div>
                 <h2>Sonraki Ders/Teneffüs</h2>
-                <p class="next-period-status" data-role="next-period-label"><?php echo esc_html($nextPeriod['label']); ?></p>
+                <p class="next-period-status" data-role="next-period-label"><?php echo esc_html($nextPeriod['label'] ?? ''); ?></p>
+                <?php if ($currentSummary !== ''): ?>
+                    <p class="next-period-current" data-role="next-period-current"><?php echo esc_html($currentSummary); ?></p>
+                <?php else: ?>
+                    <p class="next-period-current" data-role="next-period-current" hidden></p>
+                <?php endif; ?>
             </div>
         </div>
         <div class="next-period-countdown" data-role="next-period-countdown"<?php echo empty($nextPeriod['timeLeft']) ? ' hidden' : ''; ?>>
