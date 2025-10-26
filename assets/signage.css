@@ -4,20 +4,27 @@
     font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
 }
 
-.signage-grid {
-    display: grid;
-    grid-template-columns: 420px 1fr 420px;
-    grid-template-rows: auto auto 1fr auto auto;
-    grid-template-areas:
-        "logo media weather"
-        "next media schedule"
-        "teachers media schedule"
-        "news media countdown"
-        "ticker ticker ticker";
-    gap: 20px;
-    min-height: 100vh;
-    padding: 20px 24px 24px;
+.signage-stage {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
     box-sizing: border-box;
+}
+
+.signage-module {
+    position: absolute;
+    box-sizing: border-box;
+    font-size: calc(1rem * var(--module-font-scale, 1));
+}
+
+.signage-stage::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    pointer-events: none;
 }
 
 .module {
@@ -32,7 +39,7 @@
 }
 
 .module h2 {
-    font-size: 1.2rem;
+    font-size: 1.2em;
     letter-spacing: 0.02em;
     color: var(--color-primary);
 }
@@ -43,7 +50,6 @@
 }
 
 .logo-module {
-    grid-area: logo;
     flex-direction: row;
     align-items: center;
     gap: 16px;
@@ -56,7 +62,7 @@
 }
 
 .organization-name {
-    font-size: 1.8rem;
+    font-size: 1.8em;
     font-weight: 700;
 }
 
@@ -65,7 +71,6 @@
 }
 
 .next-period {
-    grid-area: next;
     border-left: 4px solid var(--color-primary);
 }
 
@@ -76,7 +81,7 @@
 }
 
 .next-period-icon {
-    font-size: 2rem;
+    font-size: 2em;
 }
 
 .next-period-countdown {
@@ -84,15 +89,15 @@
     align-items: baseline;
     gap: 8px;
     font-weight: 700;
-    font-size: 1.4rem;
+    font-size: 1.4em;
 }
 
 .next-period-countdown .countdown-value {
-    font-size: 2.2rem;
+    font-size: 2.2em;
 }
 
 .next-period-message {
-    margin: 0.5rem 0 0;
+    margin: 0.5em 0 0;
     color: rgba(255, 255, 255, 0.75);
 }
 
@@ -101,7 +106,6 @@
 }
 
 .teachers-module {
-    grid-area: teachers;
     overflow: hidden;
 }
 
@@ -146,7 +150,6 @@
 }
 
 .news-module {
-    grid-area: news;
     overflow: hidden;
 }
 
@@ -198,11 +201,10 @@
 
 .news-summary {
     color: rgba(255, 255, 255, 0.7);
-    font-size: 0.9rem;
+    font-size: 0.9em;
 }
 
 .media-module {
-    grid-area: media;
     padding: 0;
     overflow: hidden;
     position: relative;
@@ -260,9 +262,6 @@
     font-weight: 600;
 }
 
-.weather-module {
-    grid-area: weather;
-}
 
 .weather-main {
     display: flex;
@@ -271,17 +270,17 @@
 }
 
 .weather-city {
-    font-size: 1.2rem;
+    font-size: 1.2em;
     font-weight: 600;
 }
 
 .weather-temp {
-    font-size: 2.4rem;
+    font-size: 2.4em;
     font-weight: 700;
 }
 
 .weather-icon {
-    font-size: 3rem;
+    font-size: 3em;
 }
 
 .weather-meta {
@@ -289,11 +288,10 @@
     display: grid;
     gap: 6px;
     color: rgba(255, 255, 255, 0.75);
-    font-size: 0.95rem;
+    font-size: 0.95em;
 }
 
 .schedule-module {
-    grid-area: schedule;
     overflow: hidden;
 }
 
@@ -316,7 +314,7 @@
 .schedule-slide table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.85rem;
+    font-size: 0.85em;
 }
 
 .schedule-slide th,
@@ -334,13 +332,13 @@
 .period-time {
     display: block;
     color: rgba(255, 255, 255, 0.65);
-    font-size: 0.8rem;
+    font-size: 0.8em;
 }
 
 .schedule-teacher {
     display: block;
     color: rgba(255, 255, 255, 0.6);
-    font-size: 0.75rem;
+    font-size: 0.75em;
 }
 
 .schedule-empty {
@@ -363,10 +361,6 @@
 .schedule-break {
     font-weight: 600;
     color: rgba(255, 255, 255, 0.8);
-}
-
-.countdown-module {
-    grid-area: countdown;
 }
 
 .countdown-slider {
@@ -403,7 +397,7 @@
 }
 
 .countdown-icon {
-    font-size: 2.6rem;
+    font-size: 2.6em;
 }
 
 .countdown-title {
@@ -430,21 +424,20 @@
 }
 
 .countdown-value {
-    font-size: 2rem;
+    font-size: 2em;
     font-weight: 700;
     line-height: 1.1;
     color: var(--countdown-color, var(--color-primary));
 }
 
 .countdown-label {
-    font-size: 0.8rem;
+    font-size: 0.8em;
     letter-spacing: 0.02em;
     color: rgba(255, 255, 255, 0.65);
     text-align: center;
 }
 
 .ticker-module {
-    grid-area: ticker;
     padding: 0;
     border-radius: 18px;
     overflow: hidden;
@@ -452,11 +445,7 @@
 }
 
 @media (max-width: 1440px) {
-    .signage-grid {
-        grid-template-columns: 320px 1fr 320px;
-    }
-
     .organization-name {
-        font-size: 1.4rem;
+        font-size: 1.4em;
     }
 }

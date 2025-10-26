@@ -35,6 +35,38 @@ INSERT INTO signage_settings (id, organization_name)
 VALUES (1, 'Okulumuz')
 ON DUPLICATE KEY UPDATE organization_name = organization_name;
 
+CREATE TABLE IF NOT EXISTS signage_layouts (
+    module_key VARCHAR(50) PRIMARY KEY,
+    title VARCHAR(120) NOT NULL,
+    top_percent DECIMAL(5,2) NOT NULL DEFAULT 0.00,
+    left_percent DECIMAL(5,2) NOT NULL DEFAULT 0.00,
+    width_percent DECIMAL(5,2) NOT NULL DEFAULT 30.00,
+    height_percent DECIMAL(5,2) NOT NULL DEFAULT 20.00,
+    font_scale DECIMAL(4,2) NOT NULL DEFAULT 1.00,
+    z_index INT NOT NULL DEFAULT 1,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO signage_layouts (module_key, title, top_percent, left_percent, width_percent, height_percent, font_scale, z_index)
+VALUES
+    ('logo', 'Logo & Kurum Bilgisi', 2.00, 2.00, 22.00, 15.00, 1.00, 5),
+    ('next_period', 'Sonraki Ders/Teneffüs', 19.00, 2.00, 22.00, 16.00, 1.00, 4),
+    ('teachers', 'Nöbetçi Öğretmenler', 38.00, 2.00, 22.00, 30.00, 1.00, 3),
+    ('news', 'Güncel Haberler', 70.00, 2.00, 22.00, 18.00, 1.00, 3),
+    ('media', 'Medya Slayt Alanı', 8.00, 26.00, 44.00, 58.00, 1.00, 2),
+    ('schedule', 'Ders Programı', 8.00, 72.00, 26.00, 58.00, 1.00, 3),
+    ('weather', 'Hava Durumu', 2.00, 72.00, 26.00, 18.00, 1.00, 4),
+    ('countdowns', 'Yaklaşan Etkinlikler', 68.00, 72.00, 26.00, 22.00, 1.00, 3),
+    ('ticker', 'Kayan Yazılar', 90.00, 2.00, 96.00, 8.00, 1.00, 6)
+ON DUPLICATE KEY UPDATE
+    title = VALUES(title),
+    top_percent = VALUES(top_percent),
+    left_percent = VALUES(left_percent),
+    width_percent = VALUES(width_percent),
+    height_percent = VALUES(height_percent),
+    font_scale = VALUES(font_scale),
+    z_index = VALUES(z_index);
+
 CREATE TABLE IF NOT EXISTS teachers (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     first_name VARCHAR(100) NOT NULL,

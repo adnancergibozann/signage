@@ -16,6 +16,7 @@ $settings = $data['settings'];
 $tickerFontFamily = $settings['ticker_font_family'] ?? 'Segoe UI, sans-serif';
 $tickerFontSize = isset($settings['ticker_font_size']) ? (int) $settings['ticker_font_size'] : 28;
 $tickerBorderWidth = isset($settings['ticker_border_width']) ? (int) $settings['ticker_border_width'] : 2;
+$layout = $data['layout'];
 
 $tickerFontSize = max(12, min(96, $tickerFontSize));
 $tickerBorderWidth = max(0, min(12, $tickerBorderWidth));
@@ -43,6 +44,11 @@ function esc_html(?string $value): string
 {
     return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
 }
+
+function module_style_attr(array $layout, string $key): string
+{
+    return htmlspecialchars(module_layout_style($layout, $key), ENT_QUOTES, 'UTF-8');
+}
 ?>
 <!DOCTYPE html>
 <html lang="tr">
@@ -57,8 +63,8 @@ function esc_html(?string $value): string
     <link rel="stylesheet" href="<?php echo htmlspecialchars(asset_url('assets/signage.css'), ENT_QUOTES, 'UTF-8'); ?>">
 </head>
 <body class="signage-body">
-<div class="signage-grid">
-    <header class="module logo-module">
+<div class="signage-stage">
+    <header class="module signage-module logo-module" data-module="logo" style="<?php echo module_style_attr($layout, 'logo'); ?>">
         <?php if ($settings['logo_data_url']): ?>
             <img src="<?php echo esc_html($settings['logo_data_url']); ?>" alt="Logo" class="logo-image">
         <?php endif; ?>
@@ -68,7 +74,7 @@ function esc_html(?string $value): string
         </div>
     </header>
 
-    <section class="module next-period" data-next-change="<?php echo esc_html($nextPeriod['next_change_at'] ?? ''); ?>" data-state="<?php echo esc_html($nextPeriod['state']); ?>">
+    <section class="module signage-module next-period" data-module="next_period" data-next-change="<?php echo esc_html($nextPeriod['next_change_at'] ?? ''); ?>" data-state="<?php echo esc_html($nextPeriod['state']); ?>" style="<?php echo module_style_attr($layout, 'next_period'); ?>">
         <div class="next-period-header">
             <span class="next-period-icon" data-role="next-period-icon" aria-hidden="true">
                 <?php
@@ -112,7 +118,7 @@ function esc_html(?string $value): string
         <?php endif; ?>
     </section>
 
-    <section class="module teachers-module">
+    <section class="module signage-module teachers-module" data-module="teachers" style="<?php echo module_style_attr($layout, 'teachers'); ?>">
         <h2>Bugünün Nöbetçileri</h2>
         <?php if (!$teachers): ?>
             <p class="module-placeholder">Nöbetçi öğretmen atanmadı.</p>
@@ -137,7 +143,7 @@ function esc_html(?string $value): string
         <?php endif; ?>
     </section>
 
-    <section class="module news-module" data-slider="news" data-default-duration="12">
+    <section class="module signage-module news-module" data-module="news" data-slider="news" data-default-duration="12" style="<?php echo module_style_attr($layout, 'news'); ?>">
         <h2>Güncel Haberler</h2>
         <?php if (!$newsItems): ?>
             <p class="module-placeholder">Haber bulunamadı.</p>
@@ -164,7 +170,7 @@ function esc_html(?string $value): string
         <?php endif; ?>
     </section>
 
-    <section class="module media-module" data-slider="media">
+    <section class="module signage-module media-module" data-module="media" data-slider="media" style="<?php echo module_style_attr($layout, 'media'); ?>">
         <div class="media-slider">
             <?php if (!$mediaItems): ?>
                 <div class="media-slide active">
@@ -198,7 +204,7 @@ function esc_html(?string $value): string
         </div>
     </section>
 
-    <section class="module weather-module">
+    <section class="module signage-module weather-module" data-module="weather" style="<?php echo module_style_attr($layout, 'weather'); ?>">
         <h2>Hava Durumu</h2>
         <?php if (!$weather): ?>
             <p class="module-placeholder">Hava durumu verisi yok.</p>
@@ -227,7 +233,7 @@ function esc_html(?string $value): string
         <?php endif; ?>
     </section>
 
-    <section class="module schedule-module" data-slider="schedule" data-default-duration="10">
+    <section class="module signage-module schedule-module" data-module="schedule" data-slider="schedule" data-default-duration="10" style="<?php echo module_style_attr($layout, 'schedule'); ?>">
         <div class="schedule-slider">
             <?php if (!$scheduleSlides): ?>
                 <div class="schedule-slide active">
@@ -288,7 +294,7 @@ function esc_html(?string $value): string
         </div>
     </section>
 
-    <section class="module countdown-module" data-slider="countdown" data-default-duration="10">
+    <section class="module signage-module countdown-module" data-module="countdowns" data-slider="countdown" data-default-duration="10" style="<?php echo module_style_attr($layout, 'countdowns'); ?>">
         <h2>Yaklaşan Etkinlikler</h2>
         <?php if (!$countdowns): ?>
             <p class="module-placeholder">Etkinlik bulunamadı.</p>
@@ -320,7 +326,7 @@ function esc_html(?string $value): string
         <?php endif; ?>
     </section>
 
-    <footer class="module ticker-module" style="--ticker-font-family: <?php echo esc_html($tickerFontFamily); ?>; --ticker-font-size: <?php echo $tickerFontSize; ?>px; --ticker-border-width: <?php echo $tickerBorderWidth; ?>px;">
+    <footer class="module signage-module ticker-module" data-module="ticker" style="<?php echo module_style_attr($layout, 'ticker'); ?>; --ticker-font-family: <?php echo esc_html($tickerFontFamily); ?>; --ticker-font-size: <?php echo $tickerFontSize; ?>px; --ticker-border-width: <?php echo $tickerBorderWidth; ?>px;">
         <?php if (!$messages): ?>
             <div class="card" style="text-align: center;">Henüz bir içerik eklenmedi. Yönetim panelinden hemen oluşturabilirsin.</div>
         <?php else: ?>

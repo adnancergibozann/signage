@@ -4,6 +4,7 @@
 
 $navItems = [
     'ticker' => ['label' => 'Kayan Yazılar', 'href' => route_url('admin/dashboard.php')],
+    'design' => ['label' => 'Dizayn Modülü', 'href' => route_url('admin/design.php')],
     'settings' => ['label' => 'Tema & Logo', 'href' => route_url('admin/settings.php')],
     'media' => ['label' => 'Medya Yönetimi', 'href' => route_url('admin/media.php')],
     'teachers' => ['label' => 'Öğretmenler', 'href' => route_url('admin/teachers.php')],

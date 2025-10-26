@@ -3,6 +3,7 @@
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/helpers.php';
 require_once __DIR__ . '/messages.php';
+require_once __DIR__ . '/layout.php';
 
 function get_signage_data(): array
 {
@@ -16,6 +17,7 @@ function get_signage_data(): array
     $news = fetch_latest_news();
     $countdowns = fetch_active_countdowns();
     $nextPeriod = compute_next_period_state($periods);
+    $layout = fetch_signage_layouts();
 
     return [
         'settings' => $settings,
@@ -28,7 +30,36 @@ function get_signage_data(): array
         'news' => $news,
         'countdowns' => $countdowns,
         'nextPeriod' => $nextPeriod,
+        'layout' => $layout,
     ];
+}
+
+function module_layout_style(array $layoutMap, string $key): string
+{
+    $defaults = signage_layout_defaults();
+    $definition = $layoutMap[$key] ?? ($defaults[$key] ?? null);
+
+    if (!$definition) {
+        return '';
+    }
+
+    $top = max(0.0, min(100.0, (float) ($definition['top'] ?? 0)));
+    $left = max(0.0, min(100.0, (float) ($definition['left'] ?? 0)));
+    $width = max(5.0, min(100.0 - $left, (float) ($definition['width'] ?? 20)));
+    $height = max(5.0, min(100.0 - $top, (float) ($definition['height'] ?? 20)));
+    $fontScale = max(0.25, min(4.0, (float) ($definition['font_scale'] ?? 1)));
+    $zIndex = (int) ($definition['z_index'] ?? 1);
+
+    $styles = [
+        'top: ' . round($top, 2) . '%',
+        'left: ' . round($left, 2) . '%',
+        'width: ' . round($width, 2) . '%',
+        'height: ' . round($height, 2) . '%',
+        'z-index: ' . $zIndex,
+        '--module-font-scale: ' . $fontScale,
+    ];
+
+    return implode('; ', $styles);
 }
 
 function get_signage_settings(): array
