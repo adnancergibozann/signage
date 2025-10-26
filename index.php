@@ -7,6 +7,12 @@ $messages = $data['ticker'];
 $marqueeSpeed = $messages ? max(array_column($messages, 'speed')) : 30;
 $marqueeSpeed = max(5, min(60, (int) $marqueeSpeed));
 $settings = $data['settings'];
+$tickerFontFamily = $settings['ticker_font_family'] ?? 'Segoe UI, sans-serif';
+$tickerFontSize = isset($settings['ticker_font_size']) ? (int) $settings['ticker_font_size'] : 28;
+$tickerBorderWidth = isset($settings['ticker_border_width']) ? (int) $settings['ticker_border_width'] : 2;
+
+$tickerFontSize = max(12, min(96, $tickerFontSize));
+$tickerBorderWidth = max(0, min(12, $tickerBorderWidth));
 $teachers = $data['teachers'];
 $weather = $data['weather'];
 $mediaItems = $data['media'];
@@ -141,7 +147,13 @@ function esc_html(?string $value): string
                             <?php if ($item['type'] === 'image'): ?>
                                 <img src="<?php echo esc_html($item['source']); ?>" alt="<?php echo esc_html($item['title']); ?>">
                             <?php elseif ($item['type'] === 'video'): ?>
-                                <iframe src="<?php echo esc_html($item['source']); ?>" title="<?php echo esc_html($item['title']); ?>" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                                <?php if (!empty($item['is_local'])): ?>
+                                    <video src="<?php echo esc_html($item['source']); ?>" title="<?php echo esc_html($item['title']); ?>" autoplay muted loop playsinline controlslist="nodownload">
+                                        Videonuz tarayıcı tarafından desteklenmiyor.
+                                    </video>
+                                <?php else: ?>
+                                    <iframe src="<?php echo esc_html($item['source']); ?>" title="<?php echo esc_html($item['title']); ?>" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                                <?php endif; ?>
                             <?php elseif ($item['type'] === 'pdf'): ?>
                                 <iframe src="<?php echo esc_html($item['source']); ?>" title="<?php echo esc_html($item['title']); ?>"></iframe>
                             <?php else: ?>
@@ -198,8 +210,18 @@ function esc_html(?string $value): string
                             <thead>
                             <tr>
                                 <th>Periyot</th>
-                                <?php foreach (['Pzt','Sal','Çar','Per','Cum'] as $dayLabel): ?>
-                                    <th><?php echo esc_html($dayLabel); ?></th>
+                                <?php
+                                $dayLabels = [
+                                    1 => 'Pzt',
+                                    2 => 'Sal',
+                                    3 => 'Çar',
+                                    4 => 'Per',
+                                    5 => 'Cum',
+                                    6 => 'Cmt',
+                                    7 => 'Paz',
+                                ];
+                                foreach ($dayLabels as $label): ?>
+                                    <th><?php echo esc_html($label); ?></th>
                                 <?php endforeach; ?>
                             </tr>
                             </thead>
@@ -210,7 +232,7 @@ function esc_html(?string $value): string
                                         <span class="period-label"><?php echo esc_html($period['label']); ?></span>
                                         <span class="period-time"><?php echo esc_html(substr($period['start_time'], 0, 5)); ?> - <?php echo esc_html(substr($period['end_time'], 0, 5)); ?></span>
                                     </td>
-                                    <?php for ($day = 1; $day <= 5; $day++): ?>
+                                    <?php for ($day = 1; $day <= 7; $day++): ?>
                                         <?php $entry = $slide['entries'][$day][$period['period']] ?? null; ?>
                                         <td>
                                             <?php if ($entry): ?>
@@ -259,7 +281,7 @@ function esc_html(?string $value): string
         <?php endif; ?>
     </section>
 
-    <footer class="module ticker-module">
+    <footer class="module ticker-module" style="--ticker-font-family: <?php echo esc_html($tickerFontFamily); ?>; --ticker-font-size: <?php echo $tickerFontSize; ?>px; --ticker-border-width: <?php echo $tickerBorderWidth; ?>px;">
         <?php if (!$messages): ?>
             <div class="card" style="text-align: center;">Henüz bir içerik eklenmedi. Yönetim panelinden hemen oluşturabilirsin.</div>
         <?php else: ?>

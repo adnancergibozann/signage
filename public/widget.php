@@ -1,10 +1,18 @@
 <?php
 require_once __DIR__ . '/../includes/helpers.php';
 require_once __DIR__ . '/../includes/messages.php';
+require_once __DIR__ . '/../includes/signage.php';
 
 $messages = fetch_messages();
 $speed = $messages ? max(array_column($messages, 'speed')) : 30;
 $speed = max(5, min(60, (int) $speed));
+$settings = get_signage_settings();
+$tickerFontFamily = $settings['ticker_font_family'] ?? 'Segoe UI, sans-serif';
+$tickerFontSize = isset($settings['ticker_font_size']) ? (int) $settings['ticker_font_size'] : 28;
+$tickerBorderWidth = isset($settings['ticker_border_width']) ? (int) $settings['ticker_border_width'] : 2;
+
+$tickerFontSize = max(12, min(96, $tickerFontSize));
+$tickerBorderWidth = max(0, min(12, $tickerBorderWidth));
 header('Content-Type: text/html; charset=utf-8');
 ?>
 <!DOCTYPE html>
@@ -25,7 +33,7 @@ header('Content-Type: text/html; charset=utf-8');
     </style>
 </head>
 <body>
-    <div class="widget-wrapper">
+    <div class="widget-wrapper" style="--ticker-font-family: <?php echo htmlspecialchars($tickerFontFamily, ENT_QUOTES, 'UTF-8'); ?>; --ticker-font-size: <?php echo $tickerFontSize; ?>px; --ticker-border-width: <?php echo $tickerBorderWidth; ?>px;">
         <?php if (!$messages): ?>
             <div class="card" style="text-align: center;">İçerik bulunamadı.</div>
         <?php else: ?>

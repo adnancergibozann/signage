@@ -19,6 +19,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $title = trim($_POST['title'] ?? '');
         $type = $_POST['type'] ?? 'image';
         $duration = max(3, min(60, (int) ($_POST['duration'] ?? 5)));
+        $expiresInput = trim($_POST['expires_at'] ?? '');
+        $expiresAt = null;
 
         $allowedTypes = ['image', 'video', 'pdf'];
         if (!in_array($type, $allowedTypes, true)) {
@@ -30,11 +32,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $source = null;
+        $storagePath = null;
+
+        if ($expiresInput !== '') {
+            $timestamp = strtotime($expiresInput);
+            if ($timestamp === false) {
+                $errors[] = 'Geçersiz yayın bitiş tarihi.';
+            } else {
+                $expiresAt = date('Y-m-d H:i:s', $timestamp);
+            }
+        }
 
         if ($type === 'video') {
             $source = trim($_POST['video_url'] ?? '');
             if ($source === '') {
-                $errors[] = 'Video bağlantısı gereklidir.';
+                if (!empty($_FILES['video_file']['tmp_name']) && is_uploaded_file($_FILES['video_file']['tmp_name'])) {
+                    $videoMime = mime_content_type($_FILES['video_file']['tmp_name']);
+                    $videoMap = [
+                        'video/mp4' => 'mp4',
+                        'video/webm' => 'webm',
+                        'video/ogg' => 'ogv',
+                        'video/quicktime' => 'mov',
+                    ];
+
+                    if (!array_key_exists($videoMime, $videoMap)) {
+                        $errors[] = 'Desteklenmeyen video formatı. (mp4, webm, ogg, mov)';
+                    } elseif ($_FILES['video_file']['size'] > 150 * 1024 * 1024) {
+                        $errors[] = 'Video dosyası 150MB sınırını aşmamalıdır.';
+                    } else {
+                        $uploadDir = __DIR__ . '/../public/uploads/media';
+                        if (!is_dir($uploadDir) && !mkdir($uploadDir, 0775, true) && !is_dir($uploadDir)) {
+                            $errors[] = 'Video yükleme klasörü oluşturulamadı.';
+                        } else {
+                            $fileName = 'video_' . bin2hex(random_bytes(6)) . '.' . $videoMap[$videoMime];
+                            $targetPath = $uploadDir . '/' . $fileName;
+                            if (!move_uploaded_file($_FILES['video_file']['tmp_name'], $targetPath)) {
+                                $errors[] = 'Video yüklenirken hata oluştu.';
+                            } else {
+                                $storagePath = 'uploads/media/' . $fileName;
+                            }
+                        }
+                    }
+                } else {
+                    $errors[] = 'Video için URL girin veya dosya yükleyin.';
+                }
             }
         } else {
             if (!empty($_FILES['file_source']['tmp_name']) && is_uploaded_file($_FILES['file_source']['tmp_name'])) {
@@ -56,15 +97,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        if (!$errors && $source) {
-            $stmt = $pdo->prepare('INSERT INTO media_items (title, type, source, duration_seconds, position) VALUES (:title, :type, :source, :duration, :position)');
-            $stmt->execute([
-                'title' => $title,
-                'type' => $type,
-                'source' => $source,
-                'duration' => $duration,
-                'position' => 1 + (int) $pdo->query('SELECT COALESCE(MAX(position), 0) FROM media_items')->fetchColumn(),
-            ]);
+        if (!$errors && ($source || $storagePath)) {
+            $stmt = $pdo->prepare('INSERT INTO media_items (title, type, source, storage_path, duration_seconds, position, expires_at) VALUES (:title, :type, :source, :storage, :duration, :position, :expires_at)');
+            $stmt->bindValue(':title', $title);
+            $stmt->bindValue(':type', $type);
+            if ($source !== null) {
+                $stmt->bindValue(':source', $source);
+            } else {
+                $stmt->bindValue(':source', null, PDO::PARAM_NULL);
+            }
+            if ($storagePath !== null) {
+                $stmt->bindValue(':storage', $storagePath);
+            } else {
+                $stmt->bindValue(':storage', null, PDO::PARAM_NULL);
+            }
+            $stmt->bindValue(':duration', $duration, PDO::PARAM_INT);
+            $stmt->bindValue(':position', 1 + (int) $pdo->query('SELECT COALESCE(MAX(position), 0) FROM media_items')->fetchColumn(), PDO::PARAM_INT);
+            if ($expiresAt !== null) {
+                $stmt->bindValue(':expires_at', $expiresAt);
+            } else {
+                $stmt->bindValue(':expires_at', null, PDO::PARAM_NULL);
+            }
+            $stmt->execute();
 
             $_SESSION['flash'] = 'Medya öğesi eklendi.';
             header('Location: ' . route_url('admin/media.php'));
@@ -84,7 +138,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$mediaItems = $pdo->query('SELECT id, title, type, source, duration_seconds FROM media_items ORDER BY position ASC, id ASC')->fetchAll();
+$mediaItems = $pdo->query('SELECT id, title, type, source, storage_path, duration_seconds, expires_at FROM media_items ORDER BY position ASC, id ASC')->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="tr">
@@ -146,6 +200,17 @@ $mediaItems = $pdo->query('SELECT id, title, type, source, duration_seconds FROM
                 <div>
                     <label for="video_url">Video URL</label>
                     <input type="url" id="video_url" name="video_url" placeholder="https://www.youtube.com/embed/...">
+                    <small>Alternatif olarak yerel video yükleyebilirsin.</small>
+                </div>
+                <div>
+                    <label for="video_file">Video Dosyası</label>
+                    <input type="file" id="video_file" name="video_file" accept="video/*">
+                    <small>MP4, WEBM, OGG veya MOV (maks. 150MB)</small>
+                </div>
+                <div>
+                    <label for="expires_at">Yayın Bitiş Tarihi</label>
+                    <input type="datetime-local" id="expires_at" name="expires_at">
+                    <small>Boş bırakılırsa içerik süresiz yayınlanır.</small>
                 </div>
                 <div style="grid-column: 1 / -1;">
                     <button type="submit" class="button button-primary">Kaydet</button>
@@ -165,7 +230,8 @@ $mediaItems = $pdo->query('SELECT id, title, type, source, duration_seconds FROM
                             <th>Başlık</th>
                             <th>Tip</th>
                             <th>Süre</th>
-                            <th>Önizleme</th>
+                            <th>Kaynak</th>
+                            <th>Yayın Bitişi</th>
                             <th>İşlem</th>
                         </tr>
                     </thead>
@@ -178,11 +244,20 @@ $mediaItems = $pdo->query('SELECT id, title, type, source, duration_seconds FROM
                             <td><?php echo (int) $row['duration_seconds']; ?> sn</td>
                             <td>
                                 <?php if ($row['type'] === 'video'): ?>
-                                    <a href="<?php echo htmlspecialchars($row['source'], ENT_QUOTES, 'UTF-8'); ?>" target="_blank">Bağlantı</a>
+                                    <?php if (!empty($row['storage_path'])): ?>
+                                        <small>Yerel video</small>
+                                    <?php elseif (!empty($row['source'])): ?>
+                                        <a href="<?php echo htmlspecialchars($row['source'], ENT_QUOTES, 'UTF-8'); ?>" target="_blank">Bağlantı</a>
+                                    <?php else: ?>
+                                        <small>Kaynak tanımlı değil</small>
+                                    <?php endif; ?>
+                                <?php elseif ($row['type'] === 'image'): ?>
+                                    <small>Görsel yüklendi</small>
                                 <?php else: ?>
-                                    <small>Dosya yüklendi</small>
+                                    <small>PDF yüklendi</small>
                                 <?php endif; ?>
                             </td>
+                            <td><?php echo $row['expires_at'] ? htmlspecialchars($row['expires_at'], ENT_QUOTES, 'UTF-8') : 'Süresiz'; ?></td>
                             <td>
                                 <form method="post" onsubmit="return confirm('Bu medya silinsin mi?');">
                                     <input type="hidden" name="action" value="delete">

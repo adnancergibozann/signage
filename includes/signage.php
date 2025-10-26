@@ -34,19 +34,25 @@ function get_signage_data(): array
 function get_signage_settings(): array
 {
     $pdo = get_pdo();
-    $stmt = $pdo->query('SELECT organization_name, logo, logo_mime FROM signage_settings WHERE id = 1 LIMIT 1');
+    $stmt = $pdo->query('SELECT organization_name, logo, logo_mime, ticker_font_family, ticker_font_size, ticker_border_width FROM signage_settings WHERE id = 1 LIMIT 1');
     $row = $stmt->fetch();
 
     if (!$row) {
         return [
             'organization_name' => 'Okulumuz',
             'logo_data_url' => null,
+            'ticker_font_family' => 'Segoe UI, sans-serif',
+            'ticker_font_size' => 28,
+            'ticker_border_width' => 2,
         ];
     }
 
     return [
         'organization_name' => $row['organization_name'],
         'logo_data_url' => build_data_url($row['logo'], $row['logo_mime']),
+        'ticker_font_family' => $row['ticker_font_family'] ?: 'Segoe UI, sans-serif',
+        'ticker_font_size' => $row['ticker_font_size'] ? (int) $row['ticker_font_size'] : 28,
+        'ticker_border_width' => $row['ticker_border_width'] !== null ? (int) $row['ticker_border_width'] : 2,
     ];
 }
 
@@ -92,13 +98,20 @@ function fetch_latest_weather(): ?array
 function fetch_active_media_items(): array
 {
     $pdo = get_pdo();
-    $stmt = $pdo->query('SELECT title, type, source, duration_seconds FROM media_items WHERE is_active = 1 ORDER BY position ASC, id ASC');
+    $stmt = $pdo->prepare('SELECT title, type, source, storage_path, duration_seconds FROM media_items WHERE is_active = 1 AND (expires_at IS NULL OR expires_at >= :now) ORDER BY position ASC, id ASC');
+    $stmt->execute(['now' => (new \DateTimeImmutable('now'))->format('Y-m-d H:i:s')]);
     $items = [];
     foreach ($stmt->fetchAll() as $item) {
+        $source = $item['source'];
+        if (!empty($item['storage_path'])) {
+            $source = asset_url($item['storage_path']);
+        }
+
         $items[] = [
             'title' => $item['title'],
             'type' => $item['type'],
-            'source' => $item['source'],
+            'source' => $source,
+            'is_local' => !empty($item['storage_path']),
             'duration' => max(3, (int) $item['duration_seconds']),
         ];
     }

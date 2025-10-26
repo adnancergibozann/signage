@@ -7,10 +7,50 @@ require_login();
 $activePage = 'news';
 $user = current_user();
 $errors = [];
+$feedErrors = [];
+$feedPreview = null;
+$feedUrlInput = '';
 $flash = $_SESSION['flash'] ?? null;
 unset($_SESSION['flash']);
 
 $pdo = get_pdo();
+
+function extract_feed_preview(SimpleXMLElement $xml): array
+{
+    $items = [];
+
+    if (isset($xml->channel)) {
+        $channel = $xml->channel;
+        foreach ($channel->item as $entry) {
+            $items[] = [
+                'title' => (string) ($entry->title ?? ''),
+                'link' => (string) ($entry->link ?? ''),
+                'date' => (string) ($entry->pubDate ?? ''),
+            ];
+            if (count($items) >= 5) {
+                break;
+            }
+        }
+        $title = (string) ($channel->title ?? 'RSS Önizleme');
+    } else {
+        foreach ($xml->entry as $entry) {
+            $items[] = [
+                'title' => (string) ($entry->title ?? ''),
+                'link' => (string) ($entry->link['href'] ?? ''),
+                'date' => (string) ($entry->updated ?? $entry->published ?? ''),
+            ];
+            if (count($items) >= 5) {
+                break;
+            }
+        }
+        $title = (string) ($xml->title ?? 'RSS Önizleme');
+    }
+
+    return [
+        'title' => $title,
+        'items' => $items,
+    ];
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
@@ -51,9 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header('Location: ' . route_url('admin/news.php'));
             exit;
         }
-    }
-
-    if ($action === 'delete') {
+    } elseif ($action === 'delete') {
         $id = (int) ($_POST['id'] ?? 0);
         if ($id > 0) {
             $stmt = $pdo->prepare('DELETE FROM news_items WHERE id = :id');
@@ -61,6 +99,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['flash'] = 'Haber silindi.';
             header('Location: ' . route_url('admin/news.php'));
             exit;
+        }
+    } elseif ($action === 'test_feed') {
+        $feedUrlInput = trim($_POST['feed_url'] ?? '');
+        if ($feedUrlInput === '') {
+            $feedErrors[] = 'RSS adresi zorunludur.';
+        } else {
+            $context = stream_context_create([
+                'http' => [
+                    'method' => 'GET',
+                    'timeout' => 10,
+                    'header' => "User-Agent: SignageDashboard/1.0\r\nAccept: application/rss+xml, application/xml",
+                ],
+            ]);
+
+            $response = @file_get_contents($feedUrlInput, false, $context);
+            if ($response === false) {
+                $feedErrors[] = 'RSS kaynağına ulaşılamadı.';
+            } else {
+                $xml = @simplexml_load_string($response, 'SimpleXMLElement', LIBXML_NOCDATA);
+                if ($xml === false) {
+                    $feedErrors[] = 'RSS formatı okunamadı.';
+                } else {
+                    $feedPreview = extract_feed_preview($xml);
+                    $feedPreview['url'] = $feedUrlInput;
+                }
+            }
         }
     }
 }
@@ -99,6 +163,52 @@ $newsItems = $pdo->query('SELECT id, title, summary, published_at FROM news_item
                 <?php echo htmlspecialchars($flash, ENT_QUOTES, 'UTF-8'); ?>
             </div>
         <?php endif; ?>
+
+        <section class="card" style="margin-bottom: 2rem;">
+            <h2>RSS Feed Testi</h2>
+            <p>RSS adresini girerek kaynağın erişilebilirliğini ve ilk maddelerini kontrol et.</p>
+            <form method="post" class="form-grid">
+                <input type="hidden" name="action" value="test_feed">
+                <div style="grid-column: 1 / -1;">
+                    <label for="feed_url">RSS URL</label>
+                    <input type="url" id="feed_url" name="feed_url" placeholder="https://www.trthaber.com/rss" value="<?php echo htmlspecialchars($feedUrlInput, ENT_QUOTES, 'UTF-8'); ?>" required>
+                </div>
+                <div style="grid-column: 1 / -1;">
+                    <button type="submit" class="button button-secondary">Bağlantıyı Test Et</button>
+                </div>
+            </form>
+            <?php if ($feedErrors): ?>
+                <div class="alert alert-error" style="margin-top: 1rem;">
+                    <ul>
+                        <?php foreach ($feedErrors as $error): ?>
+                            <li><?php echo htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?></li>
+                        <?php endforeach; ?>
+                    </ul>
+                </div>
+            <?php endif; ?>
+            <?php if ($feedPreview && !$feedErrors): ?>
+                <div style="margin-top: 1rem;">
+                    <h3 style="margin-bottom: 0.5rem;">Önizleme: <?php echo htmlspecialchars($feedPreview['title'], ENT_QUOTES, 'UTF-8'); ?></h3>
+                    <ul style="list-style: disc; padding-left: 1.5rem;">
+                        <?php if (empty($feedPreview['items'])): ?>
+                            <li>Herhangi bir içerik bulunamadı.</li>
+                        <?php else: ?>
+                            <?php foreach ($feedPreview['items'] as $item): ?>
+                                <li style="margin-bottom: 0.5rem;">
+                                    <strong><?php echo htmlspecialchars($item['title'] ?: 'Başlık yok', ENT_QUOTES, 'UTF-8'); ?></strong>
+                                    <?php if (!empty($item['date'])): ?>
+                                        <span style="color: rgba(255,255,255,0.6);">&mdash; <?php echo htmlspecialchars($item['date'], ENT_QUOTES, 'UTF-8'); ?></span>
+                                    <?php endif; ?>
+                                    <?php if (!empty($item['link'])): ?>
+                                        <div><a href="<?php echo htmlspecialchars($item['link'], ENT_QUOTES, 'UTF-8'); ?>" target="_blank" rel="noopener">Bağlantıyı aç</a></div>
+                                    <?php endif; ?>
+                                </li>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </ul>
+                </div>
+            <?php endif; ?>
+        </section>
 
         <section class="card" style="margin-bottom: 2rem;">
             <h2>Yeni Haber</h2>

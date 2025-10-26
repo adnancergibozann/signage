@@ -25,6 +25,9 @@ CREATE TABLE IF NOT EXISTS signage_settings (
     organization_name VARCHAR(255) NOT NULL DEFAULT 'Okulumuz',
     logo LONGBLOB NULL,
     logo_mime VARCHAR(100) NULL,
+    ticker_font_family VARCHAR(150) NOT NULL DEFAULT 'Segoe UI, sans-serif',
+    ticker_font_size SMALLINT UNSIGNED NOT NULL DEFAULT 28,
+    ticker_border_width TINYINT UNSIGNED NOT NULL DEFAULT 2,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -63,13 +66,16 @@ CREATE TABLE IF NOT EXISTS media_items (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
     type ENUM('image', 'video', 'pdf') NOT NULL,
-    source TEXT NOT NULL,
+    source TEXT NULL,
+    storage_path VARCHAR(255) NULL,
     duration_seconds INT NOT NULL DEFAULT 5,
     position INT NOT NULL DEFAULT 1,
+    expires_at DATETIME NULL,
     is_active TINYINT(1) NOT NULL DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_media_active (is_active, position)
+    INDEX idx_media_active (is_active, position),
+    INDEX idx_media_expiration (expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS schedule_periods (

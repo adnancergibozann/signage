@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/messages.php';
+require_once __DIR__ . '/../includes/signage.php';
 
 require_login();
 $activePage = 'ticker';
@@ -12,8 +13,11 @@ $allowed_colors = [
 ];
 
 $errors = [];
+$styleErrors = [];
 $flash = $_SESSION['flash'] ?? null;
 unset($_SESSION['flash']);
+
+$settings = get_signage_settings();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['action']) && $_POST['action'] === 'create') {
@@ -61,6 +65,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
     }
+
+    if (isset($_POST['action']) && $_POST['action'] === 'update_style') {
+        $fontFamily = trim($_POST['ticker_font_family'] ?? '');
+        $fontSize = (int) ($_POST['ticker_font_size'] ?? 28);
+        $borderWidth = (int) ($_POST['ticker_border_width'] ?? 2);
+
+        if ($fontFamily === '') {
+            $styleErrors[] = 'Yazı tipi zorunludur.';
+        } elseif (!preg_match('/^[\p{L}0-9\s,\-\'".]+$/u', $fontFamily)) {
+            $styleErrors[] = 'Yazı tipi sadece harf, rakam, boşluk ve , - . karakterlerini içerebilir.';
+        }
+
+        $fontSize = max(12, min(96, $fontSize));
+        $borderWidth = max(0, min(12, $borderWidth));
+
+        if (!$styleErrors) {
+            $stmt = get_pdo()->prepare('UPDATE signage_settings SET ticker_font_family = :family, ticker_font_size = :size, ticker_border_width = :border WHERE id = 1');
+            $stmt->execute([
+                'family' => $fontFamily,
+                'size' => $fontSize,
+                'border' => $borderWidth,
+            ]);
+
+            $_SESSION['flash'] = 'Kayan yazı stili güncellendi.';
+            header('Location: ' . route_url('admin/dashboard.php'));
+            exit;
+        }
+
+        $settings['ticker_font_family'] = $fontFamily;
+        $settings['ticker_font_size'] = $fontSize;
+        $settings['ticker_border_width'] = $borderWidth;
+    }
 }
 
 $messages = fetch_messages();
@@ -100,6 +136,39 @@ $user = current_user();
                     <?php echo htmlspecialchars($flash, ENT_QUOTES, 'UTF-8'); ?>
                 </div>
             <?php endif; ?>
+
+            <section class="card" style="margin-bottom: 2rem;">
+                <h2>Kayan Yazı Stil Ayarları</h2>
+                <p>Yazı tipini, boyutunu ve çerçeve kalınlığını özelleştir.</p>
+                <?php if ($styleErrors): ?>
+                    <div class="alert alert-error">
+                        <ul>
+                            <?php foreach ($styleErrors as $error): ?>
+                                <li><?php echo htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?></li>
+                            <?php endforeach; ?>
+                        </ul>
+                    </div>
+                <?php endif; ?>
+                <form method="post" class="form-grid">
+                    <input type="hidden" name="action" value="update_style">
+                    <div>
+                        <label for="ticker_font_family">Yazı Tipi</label>
+                        <input type="text" id="ticker_font_family" name="ticker_font_family" value="<?php echo htmlspecialchars($settings['ticker_font_family'], ENT_QUOTES, 'UTF-8'); ?>" required>
+                        <small>Örn: "Poppins, sans-serif"</small>
+                    </div>
+                    <div>
+                        <label for="ticker_font_size">Başlık Punto (px)</label>
+                        <input type="number" id="ticker_font_size" name="ticker_font_size" min="12" max="96" value="<?php echo (int) $settings['ticker_font_size']; ?>">
+                    </div>
+                    <div>
+                        <label for="ticker_border_width">Kenarlık Kalınlığı (px)</label>
+                        <input type="number" id="ticker_border_width" name="ticker_border_width" min="0" max="12" value="<?php echo (int) $settings['ticker_border_width']; ?>">
+                    </div>
+                    <div style="grid-column: 1 / -1;">
+                        <button type="submit" class="button button-primary">Stili Kaydet</button>
+                    </div>
+                </form>
+            </section>
 
             <section class="card" style="margin-bottom: 2rem;">
                 <h2>Yeni Kayan Yazı</h2>

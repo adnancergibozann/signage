@@ -95,7 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $subject = trim($_POST['subject'] ?? '');
         $teacher = trim($_POST['teacher'] ?? '');
 
-        if ($classroom <= 0 || $weekday < 1 || $weekday > 5 || $periodNumber <= 0) {
+        if ($classroom <= 0 || $weekday < 1 || $weekday > 7 || $periodNumber <= 0) {
             $errors[] = 'Sınıf, gün ve periyot seçilmelidir.';
         }
         if ($subject === '') {
@@ -134,7 +134,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $periods = fetch_schedule_periods();
 $classrooms = $pdo->query('SELECT id, name, display_order FROM classrooms ORDER BY display_order ASC, name ASC')->fetchAll();
 $schedule = fetch_weekly_schedule();
-$weekdays = [1 => 'Pazartesi', 2 => 'Salı', 3 => 'Çarşamba', 4 => 'Perşembe', 5 => 'Cuma'];
+$weekdays = [
+    1 => 'Pazartesi',
+    2 => 'Salı',
+    3 => 'Çarşamba',
+    4 => 'Perşembe',
+    5 => 'Cuma',
+    6 => 'Cumartesi',
+    7 => 'Pazar',
+];
+$weekdayShort = [
+    1 => 'Pzt',
+    2 => 'Sal',
+    3 => 'Çar',
+    4 => 'Per',
+    5 => 'Cum',
+    6 => 'Cmt',
+    7 => 'Paz',
+];
 ?>
 <!DOCTYPE html>
 <html lang="tr">
@@ -326,8 +343,8 @@ $weekdays = [1 => 'Pazartesi', 2 => 'Salı', 3 => 'Çarşamba', 4 => 'Perşembe'
                             <thead>
                                 <tr>
                                     <th>Periyot</th>
-                                    <?php foreach ($weekdays as $label): ?>
-                                        <th><?php echo htmlspecialchars(mb_substr($label, 0, 3), ENT_QUOTES, 'UTF-8'); ?></th>
+                                    <?php foreach ($weekdays as $dayKey => $label): ?>
+                                        <th><?php echo htmlspecialchars($weekdayShort[$dayKey] ?? mb_substr($label, 0, 3), ENT_QUOTES, 'UTF-8'); ?></th>
                                     <?php endforeach; ?>
                                 </tr>
                             </thead>
@@ -335,7 +352,7 @@ $weekdays = [1 => 'Pazartesi', 2 => 'Salı', 3 => 'Çarşamba', 4 => 'Perşembe'
                             <?php foreach ($periods as $period): ?>
                                 <tr>
                                     <td><?php echo htmlspecialchars($period['label'], ENT_QUOTES, 'UTF-8'); ?><br><small><?php echo htmlspecialchars(substr($period['start_time'], 0, 5) . ' - ' . substr($period['end_time'], 0, 5), ENT_QUOTES, 'UTF-8'); ?></small></td>
-                                    <?php for ($day = 1; $day <= 5; $day++): ?>
+                                    <?php for ($day = 1; $day <= 7; $day++): ?>
                                         <?php $entry = $slide['entries'][$day][$period['period']] ?? null; ?>
                                         <td>
                                             <?php if ($entry): ?>

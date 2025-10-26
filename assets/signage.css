@@ -226,7 +226,8 @@
 }
 
 .media-content img,
-.media-content iframe {
+.media-content iframe,
+.media-content video {
     width: 100%;
     height: 100%;
     object-fit: contain;
@@ -332,6 +333,8 @@
 .countdown-slider {
     position: relative;
     flex: 1;
+    min-height: 180px;
+    overflow: hidden;
 }
 
 .countdown-card {
@@ -346,6 +349,7 @@
     padding: 16px;
     opacity: 0;
     transition: opacity 0.6s ease;
+    pointer-events: none;
 }
 
 .countdown-card.active {
@@ -383,7 +387,7 @@
     padding: 0;
     border-radius: 18px;
     overflow: hidden;
-    border: 2px solid rgba(255, 212, 0, 0.35);
+    border: var(--ticker-border-width, 2px) solid rgba(255, 212, 0, 0.35);
 }
 
 @media (max-width: 1440px) {

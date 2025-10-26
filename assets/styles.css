@@ -202,7 +202,8 @@ textarea:focus {
     position: relative;
     border-radius: var(--border-radius);
     background: var(--color-dark);
-    border: 2px solid var(--color-primary);
+    border: var(--ticker-border-width, 2px) solid var(--color-primary);
+    font-family: var(--ticker-font-family, inherit);
 }
 
 .marquee-track {
@@ -221,12 +222,12 @@ textarea:focus {
 }
 
 .marquee-title {
-    font-size: 1.5rem;
+    font-size: var(--ticker-font-size, 1.5rem);
     font-weight: 700;
 }
 
 .marquee-body {
-    font-size: 1rem;
+    font-size: calc(var(--ticker-font-size, 1.5rem) * 0.7);
     opacity: 0.85;
 }
 
