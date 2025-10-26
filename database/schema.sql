@@ -13,6 +13,8 @@ CREATE TABLE IF NOT EXISTS ticker_messages (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
     body TEXT NULL,
+    font_family VARCHAR(100) NOT NULL DEFAULT 'Arial, sans-serif',
+    font_size TINYINT UNSIGNED NOT NULL DEFAULT 28,
     text_color CHAR(7) NOT NULL DEFAULT '#FFFFFF',
     background_color CHAR(7) NOT NULL DEFAULT '#0A0A0A',
     speed INT NOT NULL DEFAULT 30,

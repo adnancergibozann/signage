@@ -29,8 +29,7 @@ $speed = max(5, min(60, (int) $speed));
             <div class="marquee">
                 <div class="marquee-track">
                     <?php foreach (array_merge($messages, $messages) as $message): ?>
-                        <div class="marquee-item" style="background: <?php echo $message['background_color']; ?>; color: <?php echo $message['text_color']; ?>;">
-                            <div class="marquee-title"><?php echo htmlspecialchars($message['title'], ENT_QUOTES, 'UTF-8'); ?></div>
+                        <div class="marquee-item" style="background: <?php echo $message['background_color']; ?>; color: <?php echo $message['text_color']; ?>; font-family: <?php echo htmlspecialchars($message['font_family'], ENT_QUOTES, 'UTF-8'); ?>; font-size: <?php echo (int) $message['font_size']; ?>px;">
                             <?php if (!empty($message['body'])): ?>
                                 <div class="marquee-body"><?php echo htmlspecialchars($message['body'], ENT_QUOTES, 'UTF-8'); ?></div>
                             <?php endif; ?>
