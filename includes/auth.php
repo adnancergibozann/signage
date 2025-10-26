@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/helpers.php';
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
@@ -13,7 +14,7 @@ function current_user(): ?array
 function require_login(): void
 {
     if (!current_user()) {
-        header('Location: /admin/login.php');
+        header('Location: ' . route_url('admin/login.php'));
         exit;
     }
 }
