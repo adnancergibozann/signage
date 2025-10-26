@@ -22,11 +22,36 @@ $tickerFontSize = max(12, min(96, $tickerFontSize));
 $tickerBorderWidth = max(0, min(12, $tickerBorderWidth));
 $teachers = $data['teachers'];
 $weather = $data['weather'];
+$weatherSettings = $data['weather_settings'] ?? ['refresh_interval_minutes' => 0, 'city' => ''];
+$weatherRefreshMinutes = isset($weatherSettings['refresh_interval_minutes']) ? (int) $weatherSettings['refresh_interval_minutes'] : 0;
+$weatherEndpoint = route_url('public/api/weather.php');
 $mediaItems = $data['media'];
 $scheduleSlides = $data['schedule'];
 $countdowns = $data['countdowns'];
 $nextPeriod = $data['nextPeriod'];
 $periods = $data['periods'];
+$timezone = new DateTimeZone(date_default_timezone_get() ?: 'Europe/Istanbul');
+$now = new DateTimeImmutable('now', $timezone);
+$currentDay = (int) $now->format('N');
+$dayNameMap = [
+    1 => ['short' => 'Pzt', 'long' => 'Pazartesi'],
+    2 => ['short' => 'Sal', 'long' => 'Salı'],
+    3 => ['short' => 'Çar', 'long' => 'Çarşamba'],
+    4 => ['short' => 'Per', 'long' => 'Perşembe'],
+    5 => ['short' => 'Cum', 'long' => 'Cuma'],
+    6 => ['short' => 'Cmt', 'long' => 'Cumartesi'],
+    7 => ['short' => 'Paz', 'long' => 'Pazar'],
+];
+$activeDayInfo = $dayNameMap[$currentDay] ?? $dayNameMap[1];
+$weatherUpdatedLabel = null;
+if ($weather && !empty($weather['fetched_at'])) {
+    try {
+        $weatherDate = new DateTimeImmutable($weather['fetched_at'], $timezone);
+        $weatherUpdatedLabel = $weatherDate->format('H:i');
+    } catch (Throwable $e) {
+        $weatherUpdatedLabel = $weather['fetched_at'];
+    }
+}
 $periodTimeline = array_map(
     static function (array $period): array {
         $start = $period['start_label'] ?? substr($period['start_time'], 0, 5);
@@ -244,31 +269,33 @@ function module_style_attr(array $layout, string $key): string
 
     <section class="module signage-module weather-module" data-module="weather" style="<?php echo module_style_attr($layout, 'weather'); ?>">
         <h2>Hava Durumu</h2>
-        <?php if (!$weather): ?>
-            <p class="module-placeholder">Hava durumu verisi yok.</p>
-        <?php else: ?>
+        <div class="weather-content" data-role="weather-content"<?php echo $weather ? '' : ' hidden'; ?>>
             <div class="weather-main">
                 <div>
-                    <p class="weather-city"><?php echo esc_html($weather['city']); ?></p>
-                    <p class="weather-temp"><?php echo esc_html(number_format($weather['temperature'], 1)); ?>°C</p>
+                    <p class="weather-city" data-role="weather-city"><?php echo esc_html($weather['city'] ?? ''); ?></p>
+                    <p class="weather-temp" data-role="weather-temp">
+                        <?php echo $weather ? esc_html(number_format((float) $weather['temperature'], 1)) : '0.0'; ?>°C
+                    </p>
                 </div>
-                <?php if (!empty($weather['icon'])): ?>
-                    <span class="weather-icon" aria-hidden="true"><?php echo esc_html($weather['icon']); ?></span>
-                <?php endif; ?>
+                <span class="weather-icon" data-role="weather-icon" aria-hidden="true"<?php echo empty($weather['icon']) ? ' hidden' : ''; ?>><?php echo esc_html($weather['icon'] ?? ''); ?></span>
             </div>
             <ul class="weather-meta">
-                <?php if ($weather['feels_like'] !== null): ?>
-                    <li>Hissedilen: <?php echo esc_html(number_format($weather['feels_like'], 1)); ?>°C</li>
-                <?php endif; ?>
-                <?php if ($weather['humidity'] !== null): ?>
-                    <li>Nem: %<?php echo esc_html($weather['humidity']); ?></li>
-                <?php endif; ?>
-                <?php if ($weather['wind_speed'] !== null): ?>
-                    <li>Rüzgar: <?php echo esc_html(number_format($weather['wind_speed'], 1)); ?> km/sa</li>
-                <?php endif; ?>
-                <li><?php echo esc_html($weather['condition']); ?></li>
+                <li data-role="weather-condition"><?php echo esc_html($weather['condition'] ?? ''); ?></li>
+                <li data-role="weather-feels"<?php echo ($weather && $weather['feels_like'] !== null) ? '' : ' hidden'; ?>>
+                    Hissedilen: <?php echo $weather && $weather['feels_like'] !== null ? esc_html(number_format((float) $weather['feels_like'], 1)) : ''; ?>°C
+                </li>
+                <li data-role="weather-humidity"<?php echo ($weather && $weather['humidity'] !== null) ? '' : ' hidden'; ?>>
+                    Nem: %<?php echo $weather && $weather['humidity'] !== null ? esc_html($weather['humidity']) : ''; ?>
+                </li>
+                <li data-role="weather-wind"<?php echo ($weather && $weather['wind_speed'] !== null) ? '' : ' hidden'; ?>>
+                    Rüzgar: <?php echo $weather && $weather['wind_speed'] !== null ? esc_html(number_format((float) $weather['wind_speed'], 1)) : ''; ?> km/sa
+                </li>
             </ul>
-        <?php endif; ?>
+            <p class="weather-updated" data-role="weather-updated"<?php echo $weatherUpdatedLabel ? '' : ' hidden'; ?>>
+                Güncelleme: <span data-role="weather-updated-time"><?php echo esc_html($weatherUpdatedLabel ?? ''); ?></span>
+            </p>
+        </div>
+        <p class="module-placeholder" data-role="weather-placeholder"<?php echo $weather ? ' hidden' : ''; ?>>Hava durumu verisi yok.</p>
     </section>
 
     <section class="module signage-module schedule-module" data-module="schedule" data-slider="schedule" data-default-duration="10" style="<?php echo module_style_attr($layout, 'schedule'); ?>">
@@ -278,39 +305,34 @@ function module_style_attr(array $layout, string $key): string
                     <p class="module-placeholder">Ders programı tanımlanmadı.</p>
                 </div>
             <?php else: ?>
+                <?php $dayShort = $activeDayInfo['short']; ?>
+                <?php $dayLong = $activeDayInfo['long']; ?>
                 <?php foreach ($scheduleSlides as $index => $slide): ?>
+                    <?php $dayEntries = $slide['entries'][$currentDay] ?? []; ?>
                     <div class="schedule-slide<?php echo $index === 0 ? ' active' : ''; ?>" data-duration="10">
                         <h3><?php echo esc_html($slide['classroom']); ?></h3>
-                        <table>
-                            <thead>
-                            <tr>
-                                <th>Periyot</th>
-                                <?php
-                                $dayLabels = [
-                                    1 => 'Pzt',
-                                    2 => 'Sal',
-                                    3 => 'Çar',
-                                    4 => 'Per',
-                                    5 => 'Cum',
-                                    6 => 'Cmt',
-                                    7 => 'Paz',
-                                ];
-                                foreach ($dayLabels as $label): ?>
-                                    <th><?php echo esc_html($label); ?></th>
-                                <?php endforeach; ?>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            <?php foreach ($periods as $period): ?>
-                                <tr class="<?php echo $period['type'] === 'break' ? 'schedule-row-break' : ''; ?>">
-                                    <td>
-                                        <span class="period-label"><?php echo esc_html($period['label']); ?></span>
-                                        <span class="period-time"><?php echo esc_html(substr($period['start_time'], 0, 5)); ?> - <?php echo esc_html(substr($period['end_time'], 0, 5)); ?></span>
-                                    </td>
-                                    <?php for ($day = 1; $day <= 7; $day++): ?>
-                                        <?php $entry = $slide['entries'][$day][$period['period']] ?? null; ?>
-                                        <td class="<?php echo $period['type'] === 'break' ? 'schedule-cell-break' : ''; ?>">
-                                            <?php if ($period['type'] === 'break'): ?>
+                        <p class="schedule-day"><?php echo esc_html($dayLong); ?></p>
+                        <div class="schedule-scroll" data-role="schedule-scroll">
+                            <table>
+                                <thead>
+                                <tr>
+                                    <th>Periyot</th>
+                                    <th><?php echo esc_html($dayShort); ?></th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <?php foreach ($periods as $period): ?>
+                                    <?php
+                                    $entry = $dayEntries[$period['period']] ?? null;
+                                    $isBreak = $period['type'] === 'break';
+                                    ?>
+                                    <tr class="<?php echo $isBreak ? 'schedule-row-break' : ''; ?>">
+                                        <td>
+                                            <span class="period-label"><?php echo esc_html($period['label']); ?></span>
+                                            <span class="period-time"><?php echo esc_html(substr($period['start_time'], 0, 5)); ?> - <?php echo esc_html(substr($period['end_time'], 0, 5)); ?></span>
+                                        </td>
+                                        <td class="<?php echo $isBreak ? 'schedule-cell-break' : ''; ?>">
+                                            <?php if ($isBreak): ?>
                                                 <span class="schedule-break">Teneffüs</span>
                                             <?php elseif ($entry): ?>
                                                 <strong><?php echo esc_html($entry['subject']); ?></strong>
@@ -321,11 +343,11 @@ function module_style_attr(array $layout, string $key): string
                                                 <span class="schedule-empty">—</span>
                                             <?php endif; ?>
                                         </td>
-                                    <?php endfor; ?>
-                                </tr>
-                            <?php endforeach; ?>
-                            </tbody>
-                        </table>
+                                    </tr>
+                                <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 <?php endforeach; ?>
             <?php endif; ?>
@@ -383,11 +405,14 @@ function module_style_attr(array $layout, string $key): string
     </footer>
 </div>
 <script>
-    window.__SIGNAGE__ = {
-        scheduleDuration: 10000,
-        periods: <?php echo json_encode($periodTimeline, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>,
-        nextPeriod: <?php echo json_encode($nextPeriod, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>
-    };
+    window.__SIGNAGE__ = <?php echo json_encode([
+        'scheduleDuration' => 10000,
+        'periods' => $periodTimeline,
+        'nextPeriod' => $nextPeriod,
+        'weatherRefreshMinutes' => $weatherRefreshMinutes,
+        'weatherEndpoint' => $weatherEndpoint,
+        'scheduleCurrentDay' => $currentDay,
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
 </script>
 <script src="<?php echo htmlspecialchars(asset_url('assets/signage.js'), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
 </body>

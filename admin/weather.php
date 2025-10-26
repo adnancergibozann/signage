@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/signage.php';
+require_once __DIR__ . '/../includes/weather.php';
 
 require_login();
 
@@ -12,7 +13,8 @@ $flash = $_SESSION['flash'] ?? null;
 unset($_SESSION['flash']);
 
 $pdo = get_pdo();
-$current = fetch_latest_weather();
+$settingsRow = get_weather_settings($pdo);
+$current = fetch_latest_weather($pdo);
 $previewWeather = null;
 
 $turkishCities = [
@@ -26,151 +28,73 @@ $turkishCities = [
     'Kırıkkale', 'Batman', 'Şırnak', 'Bartın', 'Ardahan', 'Iğdır', 'Yalova', 'Karabük', 'Kilis', 'Osmaniye', 'Düzce'
 ];
 
-$selectedCity = $_POST['city'] ?? ($current['city'] ?? '');
-
-function http_get_json(string $url): array
-{
-    $context = stream_context_create([
-        'http' => [
-            'method' => 'GET',
-            'timeout' => 10,
-            'header' => "User-Agent: SignageDashboard/1.0\r\nAccept: application/json",
-        ],
-    ]);
-
-    $response = @file_get_contents($url, false, $context);
-    if ($response === false) {
-        throw new RuntimeException('Servise ulaşılamadı.');
-    }
-
-    $decoded = json_decode($response, true);
-    if (!is_array($decoded)) {
-        throw new RuntimeException('Geçersiz API yanıtı alındı.');
-    }
-
-    return $decoded;
-}
-
-function map_weather_code(?int $code): array
-{
-    $map = [
-        0 => ['Açık', '☀️'],
-        1 => ['Güneşli', '🌤️'],
-        2 => ['Parçalı Bulutlu', '⛅'],
-        3 => ['Bulutlu', '☁️'],
-        45 => ['Sisli', '🌫️'],
-        48 => ['Sisli', '🌫️'],
-        51 => ['Çise', '🌦️'],
-        53 => ['Hafif Yağmur', '🌦️'],
-        55 => ['Yağmur', '🌧️'],
-        56 => ['Sulu Kar', '🌧️'],
-        57 => ['Sulu Kar', '🌧️'],
-        61 => ['Hafif Yağmur', '🌧️'],
-        63 => ['Yağmur', '🌧️'],
-        65 => ['Şiddetli Yağmur', '🌧️'],
-        66 => ['Karla Karışık Yağmur', '🌨️'],
-        67 => ['Karla Karışık Yağmur', '🌨️'],
-        71 => ['Hafif Kar', '🌨️'],
-        73 => ['Kar Yağışı', '❄️'],
-        75 => ['Yoğun Kar', '❄️'],
-        77 => ['Kar Taneleri', '❄️'],
-        80 => ['Sağanak', '🌦️'],
-        81 => ['Şiddetli Sağanak', '🌧️'],
-        82 => ['Şiddetli Sağanak', '⛈️'],
-        85 => ['Kar Sağanağı', '🌨️'],
-        86 => ['Yoğun Kar Sağanağı', '❄️'],
-        95 => ['Gök Gürültülü Fırtına', '⛈️'],
-        96 => ['Dolu Fırtınası', '⛈️'],
-        99 => ['Şiddetli Dolu', '⛈️'],
-    ];
-
-    return $map[$code] ?? ['Hava Durumu', 'ℹ️'];
-}
-
-function fetch_weather_from_open_meteo(string $city): array
-{
-    if ($city === '') {
-        throw new InvalidArgumentException('Şehir adı boş olamaz.');
-    }
-
-    $geoUrl = 'https://geocoding-api.open-meteo.com/v1/search?name=' . urlencode($city) . '&count=1&language=tr&format=json&country=TR';
-    $geoData = http_get_json($geoUrl);
-    if (empty($geoData['results'][0])) {
-        throw new RuntimeException('Şehir bulunamadı.');
-    }
-
-    $location = $geoData['results'][0];
-    if (!isset($location['latitude'], $location['longitude'])) {
-        throw new RuntimeException('Koordinat bilgisi alınamadı.');
-    }
-
-    $cityLabel = $location['name'];
-    $weatherUrl = sprintf(
-        'https://api.open-meteo.com/v1/forecast?latitude=%s&longitude=%s&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code&timezone=auto&temperature_unit=celsius&windspeed_unit=kmh',
-        rawurlencode((string) $location['latitude']),
-        rawurlencode((string) $location['longitude'])
-    );
-
-    $weatherData = http_get_json($weatherUrl);
-    if (empty($weatherData['current'])) {
-        throw new RuntimeException('Hava durumu verisi alınamadı.');
-    }
-
-    $current = $weatherData['current'];
-    $code = isset($current['weather_code']) ? (int) $current['weather_code'] : null;
-    [$conditionLabel, $icon] = map_weather_code($code);
-
-    return [
-        'city' => $cityLabel,
-        'temperature' => isset($current['temperature_2m']) ? (float) $current['temperature_2m'] : null,
-        'feels_like' => isset($current['apparent_temperature']) ? (float) $current['apparent_temperature'] : null,
-        'humidity' => isset($current['relative_humidity_2m']) ? (int) $current['relative_humidity_2m'] : null,
-        'wind_speed' => isset($current['wind_speed_10m']) ? (float) $current['wind_speed_10m'] : null,
-        'condition' => $conditionLabel,
-        'icon' => $icon,
-    ];
-}
+$selectedCity = $_POST['city'] ?? ($settingsRow['city'] ?: ($current['city'] ?? ''));
+$refreshInterval = isset($_POST['refresh_interval'])
+    ? (int) $_POST['refresh_interval']
+    : (int) ($settingsRow['refresh_interval_minutes'] ?? 30);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $city = trim($_POST['city'] ?? '');
     $selectedCity = $city;
+    $refreshInterval = isset($_POST['refresh_interval']) ? (int) $_POST['refresh_interval'] : $refreshInterval;
 
     if ($city === '') {
         $errors[] = 'Şehir seçimi zorunludur.';
     }
 
+    if ($refreshInterval < 5 || $refreshInterval > 180) {
+        $errors[] = 'Otomatik yenileme aralığı 5 ile 180 dakika arasında olmalıdır.';
+    }
+
     if (!$errors) {
         try {
-            $previewWeather = fetch_weather_from_open_meteo($city);
+            $latitude = null;
+            $longitude = null;
+
+            if (!empty($settingsRow['city']) && strcasecmp($settingsRow['city'], $city) === 0) {
+                $latitude = $settingsRow['latitude'];
+                $longitude = $settingsRow['longitude'];
+            }
+
+            $previewWeather = fetch_weather_from_open_meteo($city, $latitude, $longitude);
         } catch (Throwable $e) {
             $errors[] = 'API isteği başarısız: ' . $e->getMessage();
         }
     }
 
     if (!$errors && $previewWeather) {
-        $pdo->beginTransaction();
-        $pdo->exec('UPDATE weather_snapshots SET is_active = 0');
-        $stmt = $pdo->prepare('INSERT INTO weather_snapshots (city, temperature, feels_like, humidity, wind_speed, condition_label, condition_icon, fetched_at, is_active) VALUES (:city, :temp, :feels, :humidity, :wind, :label, :icon, :fetched_at, 1)');
-        $stmt->execute([
+        store_weather_snapshot($previewWeather, $pdo);
+        save_weather_settings([
             'city' => $previewWeather['city'],
-            'temp' => $previewWeather['temperature'],
-            'feels' => $previewWeather['feels_like'],
-            'humidity' => $previewWeather['humidity'],
-            'wind' => $previewWeather['wind_speed'],
-            'label' => $previewWeather['condition'],
-            'icon' => $previewWeather['icon'],
-            'fetched_at' => (new DateTimeImmutable('now'))->format('Y-m-d H:i:s'),
-        ]);
-        $pdo->commit();
+            'latitude' => $previewWeather['latitude'],
+            'longitude' => $previewWeather['longitude'],
+            'refresh_interval_minutes' => $refreshInterval,
+        ], $pdo);
 
-        $_SESSION['flash'] = sprintf('%s için hava durumu güncellendi.', $previewWeather['city']);
+        $_SESSION['flash'] = sprintf(
+            '%s için hava durumu güncellendi. Otomatik yenileme %d dakikada bir yapılacak.',
+            $previewWeather['city'],
+            $refreshInterval
+        );
         header('Location: ' . route_url('admin/weather.php'));
         exit;
     }
 }
 
+$settingsRow = get_weather_settings($pdo);
+$refreshInterval = (int) ($settingsRow['refresh_interval_minutes'] ?? $refreshInterval);
 $history = $pdo->query('SELECT city, temperature, condition_label, fetched_at FROM weather_snapshots ORDER BY fetched_at DESC LIMIT 10')->fetchAll();
 $displayWeather = $previewWeather ?: $current;
+$lastUpdatedLabel = null;
+if ($displayWeather && !empty($displayWeather['fetched_at'])) {
+    try {
+        $tz = new DateTimeZone(date_default_timezone_get() ?: 'Europe/Istanbul');
+        $lastDate = new DateTimeImmutable($displayWeather['fetched_at'], $tz);
+        $lastUpdatedLabel = $lastDate->format('d.m.Y H:i');
+    } catch (Throwable $e) {
+        $lastUpdatedLabel = $displayWeather['fetched_at'];
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="tr">
@@ -186,7 +110,7 @@ $displayWeather = $previewWeather ?: $current;
     <main class="content">
         <header style="margin-bottom: 2rem;">
             <h1 style="color: var(--color-primary);">Hava Durumu</h1>
-            <p>Open-Meteo API üzerinden son verileri getir.</p>
+            <p>Open-Meteo API üzerinden verileri çek ve signage ekranını belirlediğin aralıkta otomatik güncelle.</p>
         </header>
 
         <?php if ($errors): ?>
@@ -207,6 +131,12 @@ $displayWeather = $previewWeather ?: $current;
 
         <section class="card" style="margin-bottom: 2rem;">
             <h2>Hava Durumu Güncelle</h2>
+            <p style="margin: 0 0 1rem; color: rgba(255,255,255,0.7);">
+                Otomatik yenileme aralığı: <strong><?php echo htmlspecialchars($refreshInterval, ENT_QUOTES, 'UTF-8'); ?></strong> dakika.
+                <?php if ($lastUpdatedLabel): ?>
+                    <span style="margin-left: 0.5rem;">Son güncelleme: <strong><?php echo htmlspecialchars($lastUpdatedLabel, ENT_QUOTES, 'UTF-8'); ?></strong></span>
+                <?php endif; ?>
+            </p>
             <form method="post" class="form-grid" style="align-items: end;">
                 <div>
                     <label for="city">Şehir</label>
@@ -216,6 +146,11 @@ $displayWeather = $previewWeather ?: $current;
                             <option value="<?php echo htmlspecialchars($cityName, ENT_QUOTES, 'UTF-8'); ?>" <?php echo $selectedCity === $cityName ? 'selected' : ''; ?>><?php echo htmlspecialchars($cityName, ENT_QUOTES, 'UTF-8'); ?></option>
                         <?php endforeach; ?>
                     </select>
+                </div>
+                <div>
+                    <label for="refresh_interval">Otomatik Yenileme (dakika)</label>
+                    <input type="number" min="5" max="180" step="1" name="refresh_interval" id="refresh_interval" value="<?php echo htmlspecialchars($refreshInterval, ENT_QUOTES, 'UTF-8'); ?>" required>
+                    <p class="form-help">Signage ekranı bu aralıkla Open-Meteo'dan veri alacak.</p>
                 </div>
                 <div style="grid-column: 1 / -1;">
                     <button type="submit" class="button button-primary">API'den Güncelle</button>

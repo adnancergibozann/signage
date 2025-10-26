@@ -302,6 +302,21 @@
     font-size: 0.95em;
 }
 
+.weather-updated {
+    margin-top: 8px;
+    font-size: 0.8em;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.weather-content[hidden],
+.weather-updated[hidden],
+.weather-icon[hidden],
+[data-role="weather-feels"][hidden],
+[data-role="weather-humidity"][hidden],
+[data-role="weather-wind"][hidden] {
+    display: none !important;
+}
+
 .schedule-module {
     overflow: hidden;
 }
@@ -316,10 +331,24 @@
     inset: 0;
     opacity: 0;
     transition: opacity 0.6s ease;
+    display: flex;
+    flex-direction: column;
 }
 
 .schedule-slide.active {
     opacity: 1;
+}
+
+.schedule-day {
+    margin: 0 0 8px;
+    color: rgba(255, 255, 255, 0.7);
+    font-weight: 600;
+}
+
+.schedule-scroll {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
 }
 
 .schedule-slide table {

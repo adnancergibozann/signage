@@ -94,6 +94,19 @@ CREATE TABLE IF NOT EXISTS weather_snapshots (
     INDEX idx_weather_active (is_active, fetched_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS weather_settings (
+    id TINYINT UNSIGNED PRIMARY KEY DEFAULT 1,
+    city VARCHAR(120) NOT NULL DEFAULT '',
+    latitude DECIMAL(9,6) NULL,
+    longitude DECIMAL(9,6) NULL,
+    refresh_interval_minutes SMALLINT UNSIGNED NOT NULL DEFAULT 30,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO weather_settings (id, refresh_interval_minutes)
+VALUES (1, 30)
+ON DUPLICATE KEY UPDATE refresh_interval_minutes = VALUES(refresh_interval_minutes);
+
 CREATE TABLE IF NOT EXISTS media_items (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     title VARCHAR(255) NOT NULL,

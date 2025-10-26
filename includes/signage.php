@@ -4,13 +4,18 @@ require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/helpers.php';
 require_once __DIR__ . '/messages.php';
 require_once __DIR__ . '/layout.php';
+require_once __DIR__ . '/weather.php';
 
 function get_signage_data(): array
 {
+    $pdo = get_pdo();
     $settings = get_signage_settings();
     $ticker = fetch_messages();
     $teachers = fetch_on_duty_teachers();
-    $weather = fetch_latest_weather();
+    $weatherSettings = get_weather_settings($pdo);
+    $weather = fetch_latest_weather($pdo);
+    $weather = maybe_refresh_weather($weatherSettings, $weather, $pdo);
+    $weatherSettings = get_weather_settings($pdo);
     $media = fetch_active_media_items();
     $periods = fetch_schedule_periods();
     $schedule = fetch_weekly_schedule();
@@ -24,6 +29,7 @@ function get_signage_data(): array
         'ticker' => $ticker,
         'teachers' => $teachers,
         'weather' => $weather,
+        'weather_settings' => $weatherSettings,
         'media' => $media,
         'periods' => $periods,
         'schedule' => $schedule,
@@ -101,29 +107,6 @@ function fetch_on_duty_teachers(): array
     }
 
     return $teachers;
-}
-
-function fetch_latest_weather(): ?array
-{
-    $pdo = get_pdo();
-    $stmt = $pdo->prepare('SELECT city, temperature, feels_like, humidity, wind_speed, condition_label, condition_icon, fetched_at FROM weather_snapshots WHERE is_active = 1 ORDER BY fetched_at DESC LIMIT 1');
-    $stmt->execute();
-    $row = $stmt->fetch();
-
-    if (!$row) {
-        return null;
-    }
-
-    return [
-        'city' => $row['city'],
-        'temperature' => (float) $row['temperature'],
-        'feels_like' => $row['feels_like'] !== null ? (float) $row['feels_like'] : null,
-        'humidity' => $row['humidity'] !== null ? (int) $row['humidity'] : null,
-        'wind_speed' => $row['wind_speed'] !== null ? (float) $row['wind_speed'] : null,
-        'condition' => $row['condition_label'],
-        'icon' => $row['condition_icon'],
-        'fetched_at' => $row['fetched_at'],
-    ];
 }
 
 function fetch_active_media_items(): array

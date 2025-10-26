@@ -483,9 +483,284 @@
         setInterval(refresh, 1000);
     }
 
+    function initWeatherAutoRefresh() {
+        const section = document.querySelector('.weather-module');
+        if (!section) {
+            return;
+        }
+
+        const signageData = window.__SIGNAGE__ || {};
+        const endpoint = typeof signageData.weatherEndpoint === 'string' ? signageData.weatherEndpoint : '';
+        const refreshMinutes = Number.parseInt(signageData.weatherRefreshMinutes ?? 0, 10);
+
+        if (!endpoint || !Number.isFinite(refreshMinutes) || refreshMinutes <= 0) {
+            return;
+        }
+
+        const placeholder = section.querySelector('[data-role="weather-placeholder"]');
+        const content = section.querySelector('[data-role="weather-content"]');
+        const cityEl = section.querySelector('[data-role="weather-city"]');
+        const tempEl = section.querySelector('[data-role="weather-temp"]');
+        const iconEl = section.querySelector('[data-role="weather-icon"]');
+        const conditionEl = section.querySelector('[data-role="weather-condition"]');
+        const feelsEl = section.querySelector('[data-role="weather-feels"]');
+        const humidityEl = section.querySelector('[data-role="weather-humidity"]');
+        const windEl = section.querySelector('[data-role="weather-wind"]');
+        const updatedEl = section.querySelector('[data-role="weather-updated"]');
+        const updatedTimeEl = section.querySelector('[data-role="weather-updated-time"]');
+
+        const setHidden = (el, hidden) => {
+            if (!el) {
+                return;
+            }
+            if (hidden) {
+                el.setAttribute('hidden', '');
+            } else {
+                el.removeAttribute('hidden');
+            }
+        };
+
+        const formatNumber = (value, fractionDigits = 1) => {
+            const numeric = Number.parseFloat(value);
+            return Number.isFinite(numeric) ? numeric.toFixed(fractionDigits) : null;
+        };
+
+        const formatTimeLabel = (value) => {
+            const date = parseDate(value);
+            if (!date) {
+                return null;
+            }
+            return date.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', hour12: false });
+        };
+
+        const render = (data) => {
+            if (!data) {
+                setHidden(content, true);
+                setHidden(placeholder, false);
+                return;
+            }
+
+            setHidden(content, false);
+            setHidden(placeholder, true);
+
+            if (cityEl) {
+                cityEl.textContent = data.city || '';
+            }
+
+            if (tempEl) {
+                const formattedTemp = formatNumber(data.temperature, 1);
+                tempEl.textContent = formattedTemp !== null ? `${formattedTemp}°C` : '—';
+            }
+
+            if (iconEl) {
+                if (data.icon) {
+                    iconEl.textContent = data.icon;
+                    setHidden(iconEl, false);
+                } else {
+                    iconEl.textContent = '';
+                    setHidden(iconEl, true);
+                }
+            }
+
+            if (conditionEl) {
+                conditionEl.textContent = data.condition || '';
+            }
+
+            if (feelsEl) {
+                const formatted = formatNumber(data.feels_like, 1);
+                if (formatted !== null) {
+                    feelsEl.textContent = `Hissedilen: ${formatted}°C`;
+                    setHidden(feelsEl, false);
+                } else {
+                    feelsEl.textContent = '';
+                    setHidden(feelsEl, true);
+                }
+            }
+
+            if (humidityEl) {
+                const humidity = Number.parseInt(data.humidity ?? '', 10);
+                if (Number.isFinite(humidity)) {
+                    humidityEl.textContent = `Nem: %${humidity}`;
+                    setHidden(humidityEl, false);
+                } else {
+                    humidityEl.textContent = '';
+                    setHidden(humidityEl, true);
+                }
+            }
+
+            if (windEl) {
+                const wind = formatNumber(data.wind_speed, 1);
+                if (wind !== null) {
+                    windEl.textContent = `Rüzgar: ${wind} km/sa`;
+                    setHidden(windEl, false);
+                } else {
+                    windEl.textContent = '';
+                    setHidden(windEl, true);
+                }
+            }
+
+            if (updatedEl && updatedTimeEl) {
+                const timeLabel = data.fetched_at ? formatTimeLabel(data.fetched_at) : null;
+                if (timeLabel) {
+                    updatedTimeEl.textContent = timeLabel;
+                    setHidden(updatedEl, false);
+                } else {
+                    updatedTimeEl.textContent = '';
+                    setHidden(updatedEl, true);
+                }
+            }
+        };
+
+        let timerId = null;
+
+        const clearTimer = () => {
+            if (timerId) {
+                window.clearTimeout(timerId);
+                timerId = null;
+            }
+        };
+
+        const scheduleNext = () => {
+            clearTimer();
+            timerId = window.setTimeout(fetchWeather, Math.max(1, refreshMinutes) * 60 * 1000);
+        };
+
+        const fetchWeather = () => {
+            fetch(`${endpoint}?_=${Date.now()}`, { cache: 'no-store' })
+                .then((response) => {
+                    if (!response.ok) {
+                        throw new Error('HTTP error');
+                    }
+                    return response.json();
+                })
+                .then((payload) => {
+                    if (payload && payload.success && payload.data) {
+                        render(payload.data);
+                    }
+                })
+                .catch(() => {
+                    /* sessiz */
+                })
+                .finally(() => {
+                    scheduleNext();
+                });
+        };
+
+        scheduleNext();
+    }
+
+    function initScheduleAutoScroll() {
+        const slides = document.querySelectorAll('.schedule-slide');
+        if (!slides.length) {
+            return;
+        }
+
+        slides.forEach((slide) => {
+            const container = slide.querySelector('[data-role="schedule-scroll"]');
+            if (!container) {
+                return;
+            }
+
+            let frameId = null;
+            let pauseId = null;
+            let direction = 1;
+
+            const clearTimers = () => {
+                if (frameId) {
+                    window.clearTimeout(frameId);
+                    frameId = null;
+                }
+                if (pauseId) {
+                    window.clearTimeout(pauseId);
+                    pauseId = null;
+                }
+            };
+
+            const scheduleStep = (delay = 60) => {
+                frameId = window.setTimeout(() => {
+                    frameId = null;
+                    window.requestAnimationFrame(step);
+                }, delay);
+            };
+
+            const step = () => {
+                if (!slide.classList.contains('active')) {
+                    return;
+                }
+
+                const maxScroll = container.scrollHeight - container.clientHeight;
+                if (maxScroll <= 0) {
+                    return;
+                }
+
+                container.scrollTop += direction;
+
+                if (direction > 0 && container.scrollTop >= maxScroll) {
+                    container.scrollTop = maxScroll;
+                    clearTimers();
+                    pauseId = window.setTimeout(() => {
+                        direction = -1;
+                        scheduleStep();
+                    }, 2000);
+                    return;
+                }
+
+                if (direction < 0 && container.scrollTop <= 0) {
+                    container.scrollTop = 0;
+                    clearTimers();
+                    pauseId = window.setTimeout(() => {
+                        direction = 1;
+                        scheduleStep();
+                    }, 2000);
+                    return;
+                }
+
+                scheduleStep();
+            };
+
+            const start = () => {
+                clearTimers();
+                container.scrollTop = 0;
+                direction = 1;
+
+                if (container.scrollHeight <= container.clientHeight + 1) {
+                    return;
+                }
+
+                scheduleStep();
+            };
+
+            const stop = () => {
+                clearTimers();
+            };
+
+            const observer = new MutationObserver(() => {
+                if (slide.classList.contains('active')) {
+                    start();
+                } else {
+                    stop();
+                }
+            });
+
+            observer.observe(slide, { attributes: true, attributeFilter: ['class'] });
+
+            if (slide.classList.contains('active')) {
+                start();
+            }
+
+            window.addEventListener('resize', () => {
+                if (slide.classList.contains('active')) {
+                    start();
+                }
+            });
+        });
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         initSliders();
         initCountdowns();
         initNextPeriodTimer();
+        initWeatherAutoRefresh();
+        initScheduleAutoScroll();
     });
 })();
