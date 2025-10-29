@@ -5,6 +5,9 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../includes/signage.php';
 
 header('Content-Type: application/json; charset=UTF-8');
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+header('Expires: 0');
 
 try {
     $payload = get_signage_payload();

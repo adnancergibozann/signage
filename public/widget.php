@@ -18,6 +18,17 @@ $tickerBorderWidth = isset($settings['ticker_border_width']) ? (int) $settings['
 
 $tickerFontSize = max(12, min(96, $tickerFontSize));
 $tickerBorderWidth = max(0, min(12, $tickerBorderWidth));
+
+$noCacheHeaders = [
+    'Cache-Control: no-store, no-cache, must-revalidate, max-age=0',
+    'Pragma: no-cache',
+    'Expires: 0',
+];
+
+foreach ($noCacheHeaders as $headerValue) {
+    header($headerValue);
+}
+
 header('Content-Type: text/html; charset=utf-8');
 ?>
 <!DOCTYPE html>
@@ -26,7 +37,7 @@ header('Content-Type: text/html; charset=utf-8');
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Signage Widget</title>
-    <link rel="stylesheet" href="<?php echo htmlspecialchars(asset_url('assets/styles.css'), ENT_QUOTES, 'UTF-8'); ?>">
+    <link rel="stylesheet" href="<?php echo htmlspecialchars(asset_url_with_version('assets/styles.css'), ENT_QUOTES, 'UTF-8'); ?>">
     <style>
         body {
             margin: 0;

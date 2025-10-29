@@ -2,6 +2,16 @@
 
 require_once __DIR__ . '/includes/signage.php';
 
+$noCacheHeaders = [
+    'Cache-Control: no-store, no-cache, must-revalidate, max-age=0',
+    'Pragma: no-cache',
+    'Expires: 0',
+];
+
+foreach ($noCacheHeaders as $headerValue) {
+    header($headerValue);
+}
+
 $payload = get_signage_payload();
 $data = $payload['data'];
 $signageVersion = $payload['version'];
@@ -126,11 +136,11 @@ $signageMeta = [
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Digital Signage</title>
-    <link rel="stylesheet" href="<?php echo htmlspecialchars(asset_url('assets/styles.css'), ENT_QUOTES, 'UTF-8'); ?>">
+    <link rel="stylesheet" href="<?php echo htmlspecialchars(asset_url_with_version('assets/styles.css'), ENT_QUOTES, 'UTF-8'); ?>">
     <style>
         .marquee-track { animation-duration: <?php echo $marqueeSpeed; ?>s; }
     </style>
-    <link rel="stylesheet" href="<?php echo htmlspecialchars(asset_url('assets/signage.css'), ENT_QUOTES, 'UTF-8'); ?>">
+    <link rel="stylesheet" href="<?php echo htmlspecialchars(asset_url_with_version('assets/signage.css', $signageVersion), ENT_QUOTES, 'UTF-8'); ?>">
 </head>
 <body class="signage-body">
 <div class="signage-stage">
@@ -427,6 +437,6 @@ $signageMeta = [
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
     window.__SIGNAGE_META__ = <?php echo json_encode($signageMeta, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
 </script>
-<script src="<?php echo htmlspecialchars(asset_url('assets/signage.js'), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
+<script src="<?php echo htmlspecialchars(asset_url_with_version('assets/signage.js', $signageVersion), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
 </body>
 </html>

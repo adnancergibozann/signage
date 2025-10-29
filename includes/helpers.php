@@ -64,3 +64,34 @@ if (!function_exists('asset_url')) {
         return route_url($path);
     }
 }
+
+if (!function_exists('asset_url_with_version')) {
+    function asset_url_with_version(string $path, ?string $version = null): string
+    {
+        $url = asset_url($path);
+
+        $query = [];
+        if ($version !== null && $version !== '') {
+            $query['v'] = $version;
+        } else {
+            $root = realpath(__DIR__ . '/../');
+            if ($root !== false) {
+                $fullPath = $root . '/' . ltrim($path, '/');
+                if (is_file($fullPath)) {
+                    $mtime = (int) @filemtime($fullPath);
+                    if ($mtime > 0) {
+                        $query['v'] = (string) $mtime;
+                    }
+                }
+            }
+        }
+
+        if (!$query) {
+            return $url;
+        }
+
+        $separator = strpos($url, '?') === false ? '?' : '&';
+
+        return $url . $separator . http_build_query($query);
+    }
+}
