@@ -12,6 +12,78 @@
     box-sizing: border-box;
 }
 
+.connection-indicator {
+    position: fixed;
+    top: 20px;
+    right: 24px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.55);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.35);
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: rgba(255, 255, 255, 0.85);
+    z-index: 1000;
+    pointer-events: none;
+}
+
+.connection-indicator .connection-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #27ae60;
+    box-shadow: 0 0 12px rgba(39, 174, 96, 0.6);
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.connection-indicator .connection-label {
+    text-transform: uppercase;
+}
+
+.connection-indicator.is-checking .connection-dot {
+    background: #f1c40f;
+    box-shadow: 0 0 10px rgba(241, 196, 15, 0.55);
+    animation: connection-pulse 1s ease-in-out infinite;
+}
+
+.connection-indicator.is-offline .connection-dot {
+    background: #e74c3c;
+    box-shadow: 0 0 12px rgba(231, 76, 60, 0.65);
+    animation: none;
+}
+
+.connection-indicator.is-offline {
+    color: rgba(255, 255, 255, 0.92);
+    background: rgba(143, 21, 21, 0.6);
+}
+
+.connection-indicator.is-checking .connection-label {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.connection-indicator.is-offline .connection-label {
+    color: #ffb4ac;
+}
+
+@keyframes connection-pulse {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.2);
+        opacity: 0.6;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
 .signage-module {
     position: absolute;
     box-sizing: border-box;

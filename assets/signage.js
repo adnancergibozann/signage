@@ -761,6 +761,40 @@
         const endpoint = typeof meta.endpoint === 'string' ? meta.endpoint : '';
         let interval = Number.parseInt(meta.pollInterval ?? 0, 10);
         let currentVersion = typeof meta.version === 'string' ? meta.version : '';
+        const indicator = document.querySelector('[data-role="connection-indicator"]');
+        const indicatorLabel = indicator ? indicator.querySelector('[data-role="connection-label"]') : null;
+        let indicatorStatus = null;
+
+        const setIndicatorStatus = (status) => {
+            if (!indicator) {
+                return;
+            }
+
+            if (indicatorStatus === status) {
+                return;
+            }
+
+            indicator.classList.remove('is-online', 'is-offline', 'is-checking');
+            let className = 'is-online';
+            if (status === 'offline') {
+                className = 'is-offline';
+            } else if (status === 'checking') {
+                className = 'is-checking';
+            }
+            indicator.classList.add(className);
+
+            if (indicatorLabel) {
+                if (status === 'offline') {
+                    indicatorLabel.textContent = 'Bağlantı Yok';
+                } else if (status === 'checking') {
+                    indicatorLabel.textContent = 'Kontrol...';
+                } else {
+                    indicatorLabel.textContent = 'Bağlı';
+                }
+            }
+
+            indicatorStatus = status;
+        };
 
         if (!endpoint) {
             return;
@@ -773,6 +807,8 @@
         const minInterval = 5;
         let timerId = null;
         let pending = false;
+
+        setIndicatorStatus('online');
 
         const clearTimer = () => {
             if (timerId) {
@@ -793,6 +829,10 @@
 
             pending = true;
 
+            if (indicatorStatus !== 'offline') {
+                setIndicatorStatus('checking');
+            }
+
             const url = `${endpoint}?_=${Date.now()}`;
 
             fetch(url, { cache: 'no-store' })
@@ -804,8 +844,11 @@
                 })
                 .then((payload) => {
                     if (!payload || payload.success !== true) {
+                        setIndicatorStatus('offline');
                         return;
                     }
+
+                    setIndicatorStatus('online');
 
                     const nextVersion = typeof payload.version === 'string' ? payload.version : '';
                     if (nextVersion && nextVersion !== currentVersion) {
@@ -818,7 +861,7 @@
                     }
                 })
                 .catch(() => {
-                    /* sessizce yoksay */
+                    setIndicatorStatus('offline');
                 })
                 .finally(() => {
                     pending = false;

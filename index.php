@@ -143,6 +143,10 @@ $signageMeta = [
     <link rel="stylesheet" href="<?php echo htmlspecialchars(asset_url_with_version('assets/signage.css', $signageVersion), ENT_QUOTES, 'UTF-8'); ?>">
 </head>
 <body class="signage-body">
+<div class="connection-indicator is-online" data-role="connection-indicator" role="status" aria-live="polite">
+    <span class="connection-dot" data-role="connection-dot" aria-hidden="true"></span>
+    <span class="connection-label" data-role="connection-label">Bağlı</span>
+</div>
 <div class="signage-stage">
     <header class="module signage-module logo-module" data-module="logo" style="<?php echo module_style_attr($layout, 'logo'); ?>">
         <?php if ($settings['logo_data_url']): ?>
