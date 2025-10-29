@@ -756,11 +756,85 @@
         });
     }
 
+    function initSignageAutoRefresh() {
+        const meta = window.__SIGNAGE_META__ || {};
+        const endpoint = typeof meta.endpoint === 'string' ? meta.endpoint : '';
+        let interval = Number.parseInt(meta.pollInterval ?? 0, 10);
+        let currentVersion = typeof meta.version === 'string' ? meta.version : '';
+
+        if (!endpoint) {
+            return;
+        }
+
+        if (!Number.isFinite(interval) || interval <= 0) {
+            interval = 30;
+        }
+
+        const minInterval = 5;
+        let timerId = null;
+        let pending = false;
+
+        const clearTimer = () => {
+            if (timerId) {
+                window.clearTimeout(timerId);
+                timerId = null;
+            }
+        };
+
+        const scheduleNext = () => {
+            clearTimer();
+            timerId = window.setTimeout(checkForUpdates, Math.max(minInterval, interval) * 1000);
+        };
+
+        const checkForUpdates = () => {
+            if (pending) {
+                return;
+            }
+
+            pending = true;
+
+            const url = `${endpoint}?_=${Date.now()}`;
+
+            fetch(url, { cache: 'no-store' })
+                .then((response) => {
+                    if (!response.ok) {
+                        throw new Error('HTTP error');
+                    }
+                    return response.json();
+                })
+                .then((payload) => {
+                    if (!payload || payload.success !== true) {
+                        return;
+                    }
+
+                    const nextVersion = typeof payload.version === 'string' ? payload.version : '';
+                    if (nextVersion && nextVersion !== currentVersion) {
+                        window.location.reload();
+                        return;
+                    }
+
+                    if (nextVersion) {
+                        currentVersion = nextVersion;
+                    }
+                })
+                .catch(() => {
+                    /* sessizce yoksay */
+                })
+                .finally(() => {
+                    pending = false;
+                    scheduleNext();
+                });
+        };
+
+        scheduleNext();
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         initSliders();
         initCountdowns();
         initNextPeriodTimer();
         initWeatherAutoRefresh();
         initScheduleAutoScroll();
+        initSignageAutoRefresh();
     });
 })();

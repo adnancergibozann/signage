@@ -40,6 +40,28 @@ function get_signage_data(): array
     ];
 }
 
+function signage_data_version(array $data): string
+{
+    $encoded = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+    if ($encoded === false) {
+        $encoded = serialize($data);
+    }
+
+    return hash('sha1', $encoded);
+}
+
+function get_signage_payload(): array
+{
+    $data = get_signage_data();
+
+    return [
+        'data' => $data,
+        'version' => signage_data_version($data),
+        'generated_at' => (new \DateTimeImmutable('now'))->format(\DateTimeInterface::ATOM),
+    ];
+}
+
 function module_layout_style(array $layoutMap, string $key): string
 {
     $defaults = signage_layout_defaults();

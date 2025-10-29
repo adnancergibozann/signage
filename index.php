@@ -2,7 +2,10 @@
 
 require_once __DIR__ . '/includes/signage.php';
 
-$data = get_signage_data();
+$payload = get_signage_payload();
+$data = $payload['data'];
+$signageVersion = $payload['version'];
+$signageGeneratedAt = $payload['generated_at'];
 $messages = array_values(array_filter(
     $data['ticker'],
     static function (array $message): bool {
@@ -25,6 +28,8 @@ $weather = $data['weather'];
 $weatherSettings = $data['weather_settings'] ?? ['refresh_interval_minutes' => 0, 'city' => ''];
 $weatherRefreshMinutes = isset($weatherSettings['refresh_interval_minutes']) ? (int) $weatherSettings['refresh_interval_minutes'] : 0;
 $weatherEndpoint = route_url('public/api/weather.php');
+$signagePollEndpoint = route_url('public/api/signage.php');
+$signagePollInterval = 15;
 $mediaItems = $data['media'];
 $scheduleSlides = $data['schedule'];
 $countdowns = $data['countdowns'];
@@ -107,6 +112,13 @@ function module_style_attr(array $layout, string $key): string
 {
     return htmlspecialchars(module_layout_style($layout, $key), ENT_QUOTES, 'UTF-8');
 }
+
+$signageMeta = [
+    'endpoint' => $signagePollEndpoint,
+    'pollInterval' => $signagePollInterval,
+    'version' => $signageVersion,
+    'generatedAt' => $signageGeneratedAt,
+];
 ?>
 <!DOCTYPE html>
 <html lang="tr">
@@ -413,6 +425,7 @@ function module_style_attr(array $layout, string $key): string
         'weatherEndpoint' => $weatherEndpoint,
         'scheduleCurrentDay' => $currentDay,
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+    window.__SIGNAGE_META__ = <?php echo json_encode($signageMeta, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
 </script>
 <script src="<?php echo htmlspecialchars(asset_url('assets/signage.js'), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
 </body>
