@@ -6,6 +6,7 @@ require_login();
 
 $activePage = 'users';
 $user = current_user();
+$isSuperAdmin = is_super_admin($user);
 $passwordErrors = [];
 $userErrors = [];
 $flashSuccess = $_SESSION['flash_success'] ?? null;
@@ -57,6 +58,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($action === 'create_user') {
+        if (!$isSuperAdmin) {
+            $userErrors[] = 'Yeni kullanıcı oluşturma yetkin bulunmuyor.';
+        }
+
         $username = trim($_POST['username'] ?? '');
         $password = trim($_POST['password'] ?? '');
         $passwordConfirm = trim($_POST['password_confirm'] ?? '');
@@ -77,7 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $userErrors[] = 'Şifre tekrarı eşleşmiyor.';
         }
 
-        if (!$userErrors) {
+        if (!$userErrors && $isSuperAdmin) {
             $check = $pdo->prepare('SELECT COUNT(*) FROM admin_users WHERE username = :username');
             $check->execute(['username' => $username]);
             if ($check->fetchColumn()) {
@@ -159,36 +164,46 @@ $users = $pdo->query('SELECT id, username, created_at FROM admin_users ORDER BY 
             </form>
         </section>
 
-        <section class="card">
-            <h2>Yeni Kullanıcı Ekle</h2>
-            <?php if ($userErrors): ?>
-                <div class="alert alert-error">
-                    <ul>
-                        <?php foreach ($userErrors as $error): ?>
-                            <li><?php echo htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?></li>
-                        <?php endforeach; ?>
-                    </ul>
-                </div>
-            <?php endif; ?>
-            <form method="post" class="form-grid">
-                <input type="hidden" name="action" value="create_user">
-                <div>
-                    <label for="username">Kullanıcı Adı</label>
-                    <input type="text" id="username" name="username" minlength="3" required>
-                </div>
-                <div>
-                    <label for="password">Şifre</label>
-                    <input type="password" id="password" name="password" minlength="8" required autocomplete="new-password">
-                </div>
-                <div>
-                    <label for="password_confirm">Şifre (Tekrar)</label>
-                    <input type="password" id="password_confirm" name="password_confirm" minlength="8" required autocomplete="new-password">
-                </div>
-                <div style="grid-column: 1 / -1;">
-                    <button type="submit" class="button button-primary">Kullanıcı Oluştur</button>
-                </div>
-            </form>
-        </section>
+        <?php if ($isSuperAdmin): ?>
+            <section class="card">
+                <h2>Yeni Kullanıcı Ekle</h2>
+                <?php if ($userErrors): ?>
+                    <div class="alert alert-error">
+                        <ul>
+                            <?php foreach ($userErrors as $error): ?>
+                                <li><?php echo htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?></li>
+                            <?php endforeach; ?>
+                        </ul>
+                    </div>
+                <?php endif; ?>
+                <form method="post" class="form-grid">
+                    <input type="hidden" name="action" value="create_user">
+                    <div>
+                        <label for="username">Kullanıcı Adı</label>
+                        <input type="text" id="username" name="username" minlength="3" required>
+                    </div>
+                    <div>
+                        <label for="password">Şifre</label>
+                        <input type="password" id="password" name="password" minlength="8" required autocomplete="new-password">
+                    </div>
+                    <div>
+                        <label for="password_confirm">Şifre (Tekrar)</label>
+                        <input type="password" id="password_confirm" name="password_confirm" minlength="8" required autocomplete="new-password">
+                    </div>
+                    <div style="grid-column: 1 / -1;">
+                        <button type="submit" class="button button-primary">Kullanıcı Oluştur</button>
+                    </div>
+                </form>
+            </section>
+        <?php elseif ($userErrors): ?>
+            <div class="alert alert-error" style="margin-bottom: 2rem;">
+                <ul>
+                    <?php foreach ($userErrors as $error): ?>
+                        <li><?php echo htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?></li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
+        <?php endif; ?>
 
         <section class="card" style="margin-top: 2rem;">
             <h2>Var Olan Kullanıcılar</h2>

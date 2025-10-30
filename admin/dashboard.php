@@ -2,8 +2,10 @@
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/messages.php';
 require_once __DIR__ . '/../includes/signage.php';
+require_once __DIR__ . '/../includes/license.php';
 
 require_login();
+$user = current_user();
 $activePage = 'ticker';
 
 $allowed_colors = [
@@ -18,6 +20,24 @@ $flash = $_SESSION['flash'] ?? null;
 unset($_SESSION['flash']);
 
 $settings = get_signage_settings();
+$licenseStatus = get_license_status();
+$licenseWarning = null;
+
+if (empty($licenseStatus['is_active'])) {
+    $licenseWarning = [
+        'message' => 'Lisans aktif değil. İçerik ekranlarda görüntülenmeyecek.',
+        'type' => 'danger',
+        'action' => is_super_admin($user) ? route_url('admin/license.php') : route_url('admin/membership.php'),
+        'action_label' => is_super_admin($user) ? 'Lisansı Güncelle' : 'Detayları Gör',
+    ];
+} elseif (isset($licenseStatus['remaining_days']) && $licenseStatus['remaining_days'] <= 7) {
+    $licenseWarning = [
+        'message' => 'Lisans süresi ' . ($licenseStatus['remaining_days'] === 0 ? 'bugün' : $licenseStatus['remaining_days'] . ' gün içinde') . ' dolacak.',
+        'type' => 'warning',
+        'action' => is_super_admin($user) ? route_url('admin/license.php') : route_url('admin/membership.php'),
+        'action_label' => is_super_admin($user) ? 'Lisansı Yenile' : 'Üyeliği Gör',
+    ];
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['action']) && $_POST['action'] === 'create') {
@@ -100,7 +120,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $messages = fetch_messages();
-$user = current_user();
 ?>
 <!DOCTYPE html>
 <html lang="tr">
@@ -120,6 +139,17 @@ $user = current_user();
                     <p>Yeni mesajlar ekleyebilir, mevcut içerikleri yönetebilirsin.</p>
                 </div>
             </header>
+
+            <?php if ($licenseWarning): ?>
+                <div class="alert <?php echo $licenseWarning['type'] === 'danger' ? 'alert-error' : ''; ?>" style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem;">
+                    <span><?php echo htmlspecialchars($licenseWarning['message'], ENT_QUOTES, 'UTF-8'); ?></span>
+                    <?php if (!empty($licenseWarning['action'])): ?>
+                        <a class="button button-secondary" href="<?php echo htmlspecialchars($licenseWarning['action'], ENT_QUOTES, 'UTF-8'); ?>" style="white-space: nowrap;">
+                            <?php echo htmlspecialchars($licenseWarning['action_label'], ENT_QUOTES, 'UTF-8'); ?>
+                        </a>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
 
             <?php if ($errors): ?>
                 <div class="alert alert-error">

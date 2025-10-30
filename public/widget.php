@@ -2,6 +2,41 @@
 require_once __DIR__ . '/../includes/helpers.php';
 require_once __DIR__ . '/../includes/messages.php';
 require_once __DIR__ . '/../includes/signage.php';
+require_once __DIR__ . '/../includes/license.php';
+
+$noCacheHeaders = [
+    'Cache-Control: no-store, no-cache, must-revalidate, max-age=0',
+    'Pragma: no-cache',
+    'Expires: 0',
+];
+
+foreach ($noCacheHeaders as $headerValue) {
+    header($headerValue);
+}
+
+$license = get_license_status();
+
+if (empty($license['is_active'])) {
+    header('Content-Type: text/html; charset=utf-8');
+    ?>
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signage Widget | Lisans Gerekli</title>
+    <link rel="stylesheet" href="<?php echo htmlspecialchars(asset_url_with_version('assets/styles.css'), ENT_QUOTES, 'UTF-8'); ?>">
+</head>
+<body style="margin:0; display:flex; align-items:center; justify-content:center; min-height:100vh; background: rgba(10, 10, 10, 0.95); color:#fff;">
+    <div class="card" style="max-width:420px; text-align:center;">
+        <h1 style="color: var(--color-primary);">Lisans Gerekli</h1>
+        <p>Bu widget içeriğini görüntülemek için lisansınızın aktif olması gerekiyor.</p>
+    </div>
+</body>
+</html>
+<?php
+    exit;
+}
 
 $messages = array_values(array_filter(
     fetch_messages(),
@@ -18,16 +53,6 @@ $tickerBorderWidth = isset($settings['ticker_border_width']) ? (int) $settings['
 
 $tickerFontSize = max(12, min(96, $tickerFontSize));
 $tickerBorderWidth = max(0, min(12, $tickerBorderWidth));
-
-$noCacheHeaders = [
-    'Cache-Control: no-store, no-cache, must-revalidate, max-age=0',
-    'Pragma: no-cache',
-    'Expires: 0',
-];
-
-foreach ($noCacheHeaders as $headerValue) {
-    header($headerValue);
-}
 
 header('Content-Type: text/html; charset=utf-8');
 ?>

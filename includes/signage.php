@@ -4,6 +4,7 @@ require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/helpers.php';
 require_once __DIR__ . '/messages.php';
 require_once __DIR__ . '/layout.php';
+require_once __DIR__ . '/license.php';
 require_once __DIR__ . '/weather.php';
 
 function get_signage_data(): array
@@ -53,12 +54,27 @@ function signage_data_version(array $data): string
 
 function get_signage_payload(): array
 {
-    $data = get_signage_data();
+    $license = get_license_status();
+    $data = $license['is_active'] ? get_signage_data() : [];
+
+    $versionSeed = [
+        'license' => [
+            'status' => $license['status_code'] ?? null,
+            'start_date' => $license['start_date'] ?? null,
+            'end_date' => $license['end_date'] ?? null,
+            'updated_at' => $license['updated_at'] ?? null,
+        ],
+    ];
+
+    if ($license['is_active']) {
+        $versionSeed['data'] = $data;
+    }
 
     return [
         'data' => $data,
-        'version' => signage_data_version($data),
+        'version' => signage_data_version($versionSeed),
         'generated_at' => (new \DateTimeImmutable('now'))->format(\DateTimeInterface::ATOM),
+        'license' => $license,
     ];
 }
 

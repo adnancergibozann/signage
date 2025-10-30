@@ -1,6 +1,12 @@
 <?php
 
-require_once __DIR__ . '/includes/signage.php';
+$requireFiles = [
+    __DIR__ . '/includes/signage.php',
+];
+
+foreach ($requireFiles as $file) {
+    require_once $file;
+}
 
 $noCacheHeaders = [
     'Cache-Control: no-store, no-cache, must-revalidate, max-age=0',
@@ -12,10 +18,112 @@ foreach ($noCacheHeaders as $headerValue) {
     header($headerValue);
 }
 
+$signagePollEndpoint = route_url('public/api/signage.php');
+$signagePollInterval = 15;
+
 $payload = get_signage_payload();
-$data = $payload['data'];
 $signageVersion = $payload['version'];
 $signageGeneratedAt = $payload['generated_at'];
+$license = $payload['license'] ?? ['is_active' => true, 'status_code' => 'active'];
+$signageMeta = [
+    'endpoint' => $signagePollEndpoint,
+    'pollInterval' => $signagePollInterval,
+    'version' => $signageVersion,
+    'generatedAt' => $signageGeneratedAt,
+];
+
+$formatLicenseDate = static function (?string $value, string $format = 'd.m.Y'): ?string {
+    if (!$value) {
+        return null;
+    }
+
+    try {
+        $date = new DateTimeImmutable($value);
+        return $date->format($format);
+    } catch (Throwable $e) {
+        return $value;
+    }
+};
+
+if (empty($license['is_active'])) {
+    $licenseTypeLabel = ($license['license_type'] ?? 'monthly') === 'yearly' ? 'Yıllık' : 'Aylık';
+    $startLabel = $formatLicenseDate($license['start_date'] ?? null) ?? '-';
+    $endLabel = $formatLicenseDate($license['end_date'] ?? null) ?? '-';
+    $updatedLabel = $formatLicenseDate($license['updated_at'] ?? null, 'd.m.Y H:i') ?? '-';
+
+    $statusCode = $license['status_code'] ?? 'inactive';
+    $headline = 'Lisans Gerekiyor';
+    $description = 'Signage ekranı geçici olarak devre dışı bırakıldı.';
+
+    if ($statusCode === 'expired') {
+        $headline = 'Lisans Süresi Doldu';
+        $description = 'Lisansınız ' . ($endLabel !== '-' ? $endLabel : 'belirtilen') . ' tarihinde sona erdi.';
+    } elseif (!empty($license['is_manually_disabled'])) {
+        $headline = 'Lisans Devre Dışı';
+        $description = 'Lisansınız geçici olarak pasif hale getirildi. Lütfen yönetici ile iletişime geçin.';
+    }
+
+    $remaining = $license['remaining_text'] ?? 'Süre doldu';
+
+    ?><!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Signage | Lisans</title>
+    <link rel="stylesheet" href="<?php echo htmlspecialchars(asset_url_with_version('assets/styles.css'), ENT_QUOTES, 'UTF-8'); ?>">
+    <link rel="stylesheet" href="<?php echo htmlspecialchars(asset_url_with_version('assets/signage.css', $signageVersion), ENT_QUOTES, 'UTF-8'); ?>">
+</head>
+<body class="signage-body license-locked">
+<div class="connection-indicator is-online" data-role="connection-indicator" role="status" aria-live="polite">
+    <span class="connection-dot" data-role="connection-dot" aria-hidden="true"></span>
+    <span class="connection-label" data-role="connection-label">Bağlı</span>
+</div>
+<main class="license-locker">
+    <section class="license-card">
+        <header>
+            <h1><?php echo htmlspecialchars($headline, ENT_QUOTES, 'UTF-8'); ?></h1>
+            <p><?php echo htmlspecialchars($description, ENT_QUOTES, 'UTF-8'); ?></p>
+        </header>
+        <dl class="license-details">
+            <div>
+                <dt>Üyelik Tipi</dt>
+                <dd><?php echo htmlspecialchars($licenseTypeLabel, ENT_QUOTES, 'UTF-8'); ?></dd>
+            </div>
+            <div>
+                <dt>Başlangıç</dt>
+                <dd><?php echo htmlspecialchars($startLabel, ENT_QUOTES, 'UTF-8'); ?></dd>
+            </div>
+            <div>
+                <dt>Bitiş</dt>
+                <dd><?php echo htmlspecialchars($endLabel, ENT_QUOTES, 'UTF-8'); ?></dd>
+            </div>
+            <div>
+                <dt>Kalan Süre</dt>
+                <dd><?php echo htmlspecialchars($remaining, ENT_QUOTES, 'UTF-8'); ?></dd>
+            </div>
+            <div>
+                <dt>Son Güncelleme</dt>
+                <dd><?php echo htmlspecialchars($updatedLabel, ENT_QUOTES, 'UTF-8'); ?></dd>
+            </div>
+        </dl>
+        <footer>
+            <p class="license-help">Lisansı yenilemek için süper yönetici paneline giriş yapın.</p>
+        </footer>
+    </section>
+</main>
+<script>
+    window.__SIGNAGE__ = { license: <?php echo json_encode($license, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?> };
+    window.__SIGNAGE_META__ = <?php echo json_encode($signageMeta, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+</script>
+<script src="<?php echo htmlspecialchars(asset_url_with_version('assets/signage.js', $signageVersion), ENT_QUOTES, 'UTF-8'); ?>" defer></script>
+</body>
+</html>
+<?php
+    exit;
+}
+
+$data = $payload['data'];
 $messages = array_values(array_filter(
     $data['ticker'],
     static function (array $message): bool {
@@ -38,13 +146,17 @@ $weather = $data['weather'];
 $weatherSettings = $data['weather_settings'] ?? ['refresh_interval_minutes' => 0, 'city' => ''];
 $weatherRefreshMinutes = isset($weatherSettings['refresh_interval_minutes']) ? (int) $weatherSettings['refresh_interval_minutes'] : 0;
 $weatherEndpoint = route_url('public/api/weather.php');
-$signagePollEndpoint = route_url('public/api/signage.php');
-$signagePollInterval = 15;
 $mediaItems = $data['media'];
 $scheduleSlides = $data['schedule'];
 $countdowns = $data['countdowns'];
 $nextPeriod = $data['nextPeriod'];
 $periods = $data['periods'];
+$signageMeta = [
+    'endpoint' => $signagePollEndpoint,
+    'pollInterval' => $signagePollInterval,
+    'version' => $signageVersion,
+    'generatedAt' => $signageGeneratedAt,
+];
 $timezone = new DateTimeZone(date_default_timezone_get() ?: 'Europe/Istanbul');
 $now = new DateTimeImmutable('now', $timezone);
 $currentDay = (int) $now->format('N');

@@ -17,6 +17,7 @@ try {
         'version' => $payload['version'],
         'generated_at' => $payload['generated_at'],
         'data' => $payload['data'],
+        'license' => $payload['license'] ?? null,
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 } catch (\Throwable $e) {
     http_response_code(500);

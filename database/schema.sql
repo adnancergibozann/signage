@@ -2,12 +2,18 @@ CREATE TABLE IF NOT EXISTS admin_users (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(50) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
+    role ENUM('admin', 'super_admin') NOT NULL DEFAULT 'admin',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-INSERT INTO admin_users (username, password_hash)
-VALUES ('admin', '$2y$12$kyWgocXyDYltldwK52lYweTeEROIh.surRj6S9boSNWvLZ5qt/gUC')
+INSERT INTO admin_users (username, password_hash, role)
+VALUES ('admin', '$2y$12$kyWgocXyDYltldwK52lYweTeEROIh.surRj6S9boSNWvLZ5qt/gUC', 'super_admin')
 ON DUPLICATE KEY UPDATE username = username;
+
+ALTER TABLE admin_users
+    ADD COLUMN IF NOT EXISTS role ENUM('admin', 'super_admin') NOT NULL DEFAULT 'admin' AFTER password_hash;
+
+UPDATE admin_users SET role = 'super_admin' WHERE username = 'admin';
 
 CREATE TABLE IF NOT EXISTS ticker_messages (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -106,6 +112,24 @@ CREATE TABLE IF NOT EXISTS weather_settings (
 INSERT INTO weather_settings (id, refresh_interval_minutes)
 VALUES (1, 30)
 ON DUPLICATE KEY UPDATE refresh_interval_minutes = VALUES(refresh_interval_minutes);
+
+CREATE TABLE IF NOT EXISTS license_settings (
+    id TINYINT UNSIGNED PRIMARY KEY DEFAULT 1,
+    license_type ENUM('monthly', 'yearly') NOT NULL DEFAULT 'monthly',
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    notes TEXT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO license_settings (id, license_type, start_date, end_date, is_active)
+VALUES (1, 'yearly', CURDATE(), DATE_ADD(CURDATE(), INTERVAL 1 YEAR), 1)
+ON DUPLICATE KEY UPDATE
+    license_type = license_type,
+    start_date = start_date,
+    end_date = end_date,
+    is_active = is_active;
 
 CREATE TABLE IF NOT EXISTS media_items (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
