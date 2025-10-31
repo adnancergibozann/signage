@@ -1,0 +1,308 @@
+:root {
+    --gap-primary: #E3000B;
+    --gap-secondary: #17007A;
+    --gap-bg: #080915;
+    --gap-surface: rgba(12, 16, 38, 0.82);
+    --gap-text: #F5F7FF;
+    --gap-muted: rgba(245, 247, 255, 0.65);
+}
+
+body {
+    margin: 0;
+    font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    background: radial-gradient(circle at top, rgba(23, 0, 122, 0.25), transparent 55%),
+        radial-gradient(circle at bottom, rgba(227, 0, 11, 0.18), transparent 60%),
+        var(--gap-bg);
+    color: var(--gap-text);
+    height: 100vh;
+    overflow: hidden;
+}
+
+.signage-canvas {
+    width: 1080px;
+    height: 1920px;
+    margin: 0 auto;
+    padding: 32px;
+    box-sizing: border-box;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    gap: 24px;
+    position: relative;
+}
+
+@media (min-width: 1900px) {
+    .signage-canvas.landscape {
+        width: 1920px;
+        height: 1080px;
+        grid-template-columns: 1fr;
+    }
+}
+
+.header-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(8, 9, 21, 0.65);
+    border-radius: 18px;
+    padding: 18px 24px;
+    border: 2px solid rgba(23, 0, 122, 0.55);
+}
+
+.branding {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+}
+
+.branding img {
+    width: 140px;
+    height: 140px;
+    object-fit: contain;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 18px;
+    padding: 10px;
+}
+
+.branding h1 {
+    font-size: 2.2rem;
+    margin: 0;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.clock {
+    text-align: right;
+}
+
+.clock .time {
+    font-size: 3rem;
+    font-weight: 600;
+}
+
+.clock .date {
+    font-size: 1.2rem;
+    color: var(--gap-muted);
+}
+
+.main-area {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 24px;
+}
+
+.status-board {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 18px;
+}
+
+.manager-card {
+    background: var(--gap-surface);
+    border-radius: 20px;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    border: 2px solid rgba(227, 0, 11, 0.45);
+    position: relative;
+    min-height: 220px;
+}
+
+.manager-card::after {
+    content: attr(data-status-label);
+    position: absolute;
+    top: -12px;
+    right: 18px;
+    background: var(--gap-secondary);
+    padding: 6px 16px;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    letter-spacing: 0.02em;
+}
+
+.manager-card.meeting::after {
+    background: var(--gap-primary);
+}
+
+.manager-card.lunch::after {
+    background: linear-gradient(90deg, var(--gap-secondary), var(--gap-primary));
+}
+
+.manager-card.leave::after {
+    background: rgba(255, 255, 255, 0.25);
+    color: #080915;
+}
+
+.manager-header {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+}
+
+.manager-photo {
+    width: 72px;
+    height: 72px;
+    border-radius: 18px;
+    object-fit: cover;
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.manager-info h2 {
+    margin: 0;
+    font-size: 1.4rem;
+}
+
+.manager-info span {
+    color: var(--gap-muted);
+    font-size: 0.95rem;
+}
+
+.status-note {
+    font-size: 1rem;
+    color: var(--gap-muted);
+}
+
+.countdown {
+    margin-top: auto;
+    font-size: 2.4rem;
+    font-weight: 600;
+    text-align: right;
+}
+
+.announcements {
+    background: var(--gap-surface);
+    border-radius: 20px;
+    padding: 20px;
+    border: 2px solid rgba(23, 0, 122, 0.45);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.announcements h2 {
+    margin: 0;
+    font-size: 1.5rem;
+}
+
+.announcement-item {
+    padding: 14px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.organigram-button {
+    margin-top: auto;
+    align-self: flex-start;
+    background: linear-gradient(135deg, var(--gap-secondary), var(--gap-primary));
+    border: none;
+    color: #fff;
+    padding: 12px 18px;
+    border-radius: 14px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.organigram-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.75);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    z-index: 20;
+}
+
+.organigram-modal.active {
+    display: flex;
+}
+
+.organigram-modal img {
+    max-width: 90vw;
+    max-height: 90vh;
+    object-fit: contain;
+    border-radius: 12px;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.45);
+    background: #fff;
+}
+
+.organigram-modal button {
+    position: absolute;
+    top: 30px;
+    right: 40px;
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    border: none;
+    font-size: 1.5rem;
+    padding: 12px 18px;
+    border-radius: 999px;
+    cursor: pointer;
+}
+
+.ticker-bar {
+    background: rgba(8, 9, 21, 0.9);
+    border-radius: 16px;
+    border: 2px solid rgba(227, 0, 11, 0.55);
+    overflow: hidden;
+    position: relative;
+    min-height: 70px;
+    display: flex;
+    align-items: center;
+}
+
+.ticker-track {
+    display: flex;
+    gap: 48px;
+    white-space: nowrap;
+    animation: ticker var(--ticker-speed, 35s) linear infinite;
+}
+
+.ticker-item {
+    font-size: 1.3rem;
+    letter-spacing: 0.03em;
+}
+
+@keyframes ticker {
+    from {
+        transform: translateX(0);
+    }
+    to {
+        transform: translateX(-50%);
+    }
+}
+
+.alert-banner {
+    background: rgba(227, 0, 11, 0.25);
+    border: 2px solid rgba(227, 0, 11, 0.65);
+    border-radius: 18px;
+    padding: 14px 18px;
+    margin-top: 18px;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.fullscreen-media {
+    position: absolute;
+    inset: 0;
+    background: #000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 25;
+}
+
+.fullscreen-media.active {
+    display: flex;
+}
+
+.fullscreen-media img,
+.fullscreen-media video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}

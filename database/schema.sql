@@ -1,127 +1,96 @@
-CREATE TABLE IF NOT EXISTS admin_users (
+CREATE TABLE IF NOT EXISTS users (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(50) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-INSERT INTO admin_users (username, password_hash)
-VALUES ('admin', '$2y$12$kyWgocXyDYltldwK52lYweTeEROIh.surRj6S9boSNWvLZ5qt/gUC')
-ON DUPLICATE KEY UPDATE username = username;
-
-CREATE TABLE IF NOT EXISTS ticker_messages (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    title VARCHAR(255) NOT NULL,
-    body TEXT NULL,
-    text_color CHAR(7) NOT NULL DEFAULT '#FFFFFF',
-    background_color CHAR(7) NOT NULL DEFAULT '#0A0A0A',
-    speed INT NOT NULL DEFAULT 30,
-    position INT NOT NULL DEFAULT 1,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS signage_settings (
-    id TINYINT UNSIGNED PRIMARY KEY DEFAULT 1,
-    organization_name VARCHAR(255) NOT NULL DEFAULT 'Okulumuz',
-    logo LONGBLOB NULL,
-    logo_mime VARCHAR(100) NULL,
+    role ENUM('super_admin', 'boss', 'manager', 'viewer') NOT NULL DEFAULT 'viewer',
+    full_name VARCHAR(120) NOT NULL,
+    department VARCHAR(120) NULL,
+    email VARCHAR(120) NULL,
+    phone VARCHAR(40) NULL,
+    photo_path VARCHAR(255) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-INSERT INTO signage_settings (id, organization_name)
-VALUES (1, 'Okulumuz')
-ON DUPLICATE KEY UPDATE organization_name = organization_name;
+CREATE TABLE IF NOT EXISTS manager_statuses (
+    user_id INT UNSIGNED PRIMARY KEY,
+    status ENUM('available', 'unavailable', 'meeting', 'lunch', 'leave') NOT NULL DEFAULT 'available',
+    state_started_at DATETIME NULL,
+    state_ends_at DATETIME NULL,
+    note VARCHAR(255) NULL,
+    active_meeting_id INT UNSIGNED NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_status_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS teachers (
+CREATE TABLE IF NOT EXISTS meeting_logs (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    first_name VARCHAR(100) NOT NULL,
-    last_name VARCHAR(100) NOT NULL,
-    branch VARCHAR(120) NOT NULL,
-    photo LONGBLOB NULL,
-    photo_mime VARCHAR(100) NULL,
-    is_on_duty TINYINT(1) NOT NULL DEFAULT 0,
-    position INT NOT NULL DEFAULT 1,
+    manager_id INT UNSIGNED NOT NULL,
+    started_at DATETIME NOT NULL,
+    expected_end_at DATETIME NULL,
+    ended_at DATETIME NULL,
+    note VARCHAR(255) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_meeting_manager FOREIGN KEY (manager_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_meeting_manager_day (manager_id, started_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS announcements (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    body TEXT NULL,
+    priority INT NOT NULL DEFAULT 1,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    starts_at DATETIME NULL,
+    ends_at DATETIME NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS weather_snapshots (
+CREATE TABLE IF NOT EXISTS ticker_items (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    city VARCHAR(120) NOT NULL,
-    temperature DECIMAL(4,1) NOT NULL,
-    feels_like DECIMAL(4,1) NULL,
-    humidity TINYINT UNSIGNED NULL,
-    wind_speed DECIMAL(4,1) NULL,
-    condition_label VARCHAR(80) NOT NULL,
-    condition_icon VARCHAR(40) NULL,
-    fetched_at DATETIME NOT NULL,
+    message VARCHAR(255) NOT NULL,
+    priority INT NOT NULL DEFAULT 1,
     is_active TINYINT(1) NOT NULL DEFAULT 1,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_weather_active (is_active, fetched_at)
+    starts_at DATETIME NULL,
+    ends_at DATETIME NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS media_items (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
-    type ENUM('image', 'video', 'pdf') NOT NULL,
-    source TEXT NOT NULL,
-    duration_seconds INT NOT NULL DEFAULT 5,
-    position INT NOT NULL DEFAULT 1,
+    file_path VARCHAR(255) NOT NULL,
+    media_type ENUM('image', 'video') NOT NULL,
+    is_fullscreen TINYINT(1) NOT NULL DEFAULT 1,
+    duration_seconds INT NULL,
+    priority INT NOT NULL DEFAULT 1,
     is_active TINYINT(1) NOT NULL DEFAULT 1,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_media_active (is_active, position)
+    starts_at DATETIME NULL,
+    ends_at DATETIME NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS schedule_periods (
-    id TINYINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    period_number TINYINT UNSIGNED NOT NULL,
-    label VARCHAR(50) NOT NULL,
-    start_time TIME NOT NULL,
-    end_time TIME NOT NULL,
-    UNIQUE KEY uniq_period_number (period_number)
+CREATE TABLE IF NOT EXISTS settings (
+    `key` VARCHAR(60) NOT NULL PRIMARY KEY,
+    `value` TEXT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS classrooms (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(50) NOT NULL,
-    display_order INT NOT NULL DEFAULT 1,
-    UNIQUE KEY uniq_classroom_name (name)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+INSERT INTO users (username, password_hash, role, full_name, department) VALUES
+    ('admin', '$2y$12$kyWgocXyDYltldwK52lYweTeEROIh.surRj6S9boSNWvLZ5qt/gUC', 'super_admin', 'Süper Yönetici', 'Bilgi İşlem'),
+    ('boss', '$2y$12$VsQpdEEYZShT0jTD08CD2.bxesM4tsF.nj6o6EwBFeQZmRMch0We6', 'boss', 'Genel Müdür', 'Yönetim'),
+    ('ayse', '$2y$12$t8WX/X/9IZavAEQOnw5xk.1WxufQPVXc2jxcLw3odtDEGOcvzLoee', 'manager', 'Ayşe Kara', 'Satınalma'),
+    ('mehmet', '$2y$12$t8WX/X/9IZavAEQOnw5xk.1WxufQPVXc2jxcLw3odtDEGOcvzLoee', 'manager', 'Mehmet Yıldız', 'Satınalma');
 
-CREATE TABLE IF NOT EXISTS class_schedule_entries (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    classroom_id INT UNSIGNED NOT NULL,
-    weekday TINYINT UNSIGNED NOT NULL,
-    period_number TINYINT UNSIGNED NOT NULL,
-    subject VARCHAR(120) NOT NULL,
-    teacher VARCHAR(120) NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY uniq_schedule (classroom_id, weekday, period_number),
-    CONSTRAINT fk_schedule_classroom FOREIGN KEY (classroom_id) REFERENCES classrooms(id) ON DELETE CASCADE,
-    CONSTRAINT fk_schedule_period FOREIGN KEY (period_number) REFERENCES schedule_periods(period_number) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+INSERT IGNORE INTO manager_statuses (user_id, status) VALUES
+    ((SELECT id FROM users WHERE username = 'ayse'), 'available'),
+    ((SELECT id FROM users WHERE username = 'mehmet'), 'available');
 
-CREATE TABLE IF NOT EXISTS news_items (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    title VARCHAR(255) NOT NULL,
-    summary TEXT NULL,
-    image_url VARCHAR(255) NULL,
-    source_url VARCHAR(255) NULL,
-    published_at DATETIME NULL,
-    position INT NOT NULL DEFAULT 1,
-    is_active TINYINT(1) NOT NULL DEFAULT 1,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_news_active (is_active, published_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS countdowns (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    title VARCHAR(255) NOT NULL,
-    target_at DATETIME NOT NULL,
-    icon VARCHAR(20) NULL,
-    highlight_color CHAR(7) NOT NULL DEFAULT '#FFD400',
-    is_active TINYINT(1) NOT NULL DEFAULT 1,
-    position INT NOT NULL DEFAULT 1,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_countdown_active (is_active, target_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+INSERT INTO settings (`key`, `value`) VALUES
+    ('company_name', 'Gapgross'),
+    ('theme_primary', '#E3000B'),
+    ('theme_secondary', '#17007A'),
+    ('signage_refresh_seconds', '5'),
+    ('time_format', '24h'),
+    ('ticker_speed', '40')
+ON DUPLICATE KEY UPDATE `value` = VALUES(`value`);
