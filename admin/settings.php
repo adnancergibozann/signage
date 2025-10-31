@@ -112,14 +112,14 @@ include __DIR__ . '/partials/header.php';
                 <label for="logo">Logo</label>
                 <input type="file" id="logo" name="logo" accept="image/*">
                 <?php if (!empty($currentSettings['logo_path'])): ?>
-                    <p><a class="button secondary" href="<?= asset_url('uploads/branding/' . $currentSettings['logo_path']) ?>" target="_blank">Mevcut Logoyu Gör</a></p>
+                    <p><a class="button secondary" href="<?= asset_url('public/uploads/branding/' . $currentSettings['logo_path']) ?>" target="_blank">Mevcut Logoyu Gör</a></p>
                 <?php endif; ?>
             </div>
             <div>
                 <label for="organigram">Yönetim Şeması Görseli</label>
                 <input type="file" id="organigram" name="organigram" accept="image/*">
                 <?php if (!empty($currentSettings['organigram_path'])): ?>
-                    <p><a class="button secondary" href="<?= asset_url('uploads/branding/' . $currentSettings['organigram_path']) ?>" target="_blank">Mevcut Şemayı Gör</a></p>
+                    <p><a class="button secondary" href="<?= asset_url('public/uploads/branding/' . $currentSettings['organigram_path']) ?>" target="_blank">Mevcut Şemayı Gör</a></p>
                 <?php endif; ?>
             </div>
         </div>

@@ -31,8 +31,8 @@ function fetch_signage_state(): array
             'primaryColor' => $primary,
             'secondaryColor' => $secondary,
             'tickerSpeed' => $tickerSpeed,
-            'logoUrl' => $logoPath ? asset_url('uploads/branding/' . $logoPath) : null,
-            'organigramUrl' => $organigramPath ? asset_url('uploads/branding/' . $organigramPath) : null,
+            'logoUrl' => $logoPath ? asset_url('public/uploads/branding/' . $logoPath) : null,
+            'organigramUrl' => $organigramPath ? asset_url('public/uploads/branding/' . $organigramPath) : null,
         ],
         'managers' => $managers,
         'announcements' => $announcements,
@@ -66,7 +66,7 @@ function fetch_managers_with_status(PDO $pdo, DateTimeImmutable $now): array
             'department' => $row['department'],
             'status' => $status,
             'statusLabel' => map_status_label($status),
-            'photoUrl' => $row['photo_path'] ? asset_url('uploads/profile/' . $row['photo_path']) : null,
+            'photoUrl' => $row['photo_path'] ? asset_url('public/uploads/profile/' . $row['photo_path']) : null,
             'note' => $row['note'],
             'remainingSeconds' => $status === 'meeting' ? $remainingSeconds : null,
             'endsAt' => $endsAt,
@@ -133,7 +133,7 @@ function find_active_media(PDO $pdo, DateTimeImmutable $now): ?array
     return [
         'title' => $media['title'],
         'type' => $media['media_type'],
-        'url' => asset_url('uploads/media/' . $media['file_path']),
+        'url' => asset_url('public/uploads/media/' . $media['file_path']),
         'durationSeconds' => $media['duration_seconds'] ? (int) $media['duration_seconds'] : null,
     ];
 }

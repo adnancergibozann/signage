@@ -94,7 +94,7 @@ include __DIR__ . '/partials/header.php';
         <div class="card" style="background: rgba(16,21,44,0.75);">
             <h4><?= htmlspecialchars($item['title']) ?> <small>(<?= htmlspecialchars($item['media_type']) ?>)</small></h4>
             <p>
-                <a class="button secondary" href="<?= asset_url('uploads/media/' . $item['file_path']) ?>" target="_blank">İzle/Gör</a>
+                <a class="button secondary" href="<?= asset_url('public/uploads/media/' . $item['file_path']) ?>" target="_blank">İzle/Gör</a>
             </p>
             <form method="post" enctype="multipart/form-data">
                 <input type="hidden" name="action" value="update">
