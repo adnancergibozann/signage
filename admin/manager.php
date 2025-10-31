@@ -37,13 +37,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+$now = new DateTimeImmutable();
 $managerData = null;
-foreach (fetch_managers_with_status($pdo, new DateTimeImmutable(), $settings) as $manager) {
+foreach (fetch_managers_with_status($pdo, $now, $settings) as $manager) {
     if ($manager['id'] === $user['id']) {
         $managerData = $manager;
         break;
     }
 }
+
+$upcomingMeetings = fetch_scheduled_meetings($pdo, [
+    'manager_id' => $user['id'],
+    'status_in' => ['planned', 'in_progress'],
+    'from' => $now,
+    'order' => 'ASC',
+    'limit' => 10,
+]);
 
 include __DIR__ . '/partials/header.php';
 ?>
@@ -93,6 +102,58 @@ include __DIR__ . '/partials/header.php';
             <button class="button" type="submit">Durumu Kaydet</button>
         </div>
     </form>
+</section>
+
+<section class="card">
+    <h3>Planlı Görüşmelerim</h3>
+    <?php if (!$upcomingMeetings): ?>
+        <p>Yaklaşan planlı görüşmeniz bulunmuyor.</p>
+    <?php else: ?>
+        <div class="table-scroll">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Başlangıç</th>
+                        <th>Durum</th>
+                        <th>Misafir</th>
+                        <th>Konu / Not</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($upcomingMeetings as $meeting): ?>
+                        <?php
+                            $startLabel = $meeting['scheduled_start'] ? format_datetime($meeting['scheduled_start'], 'd.m H:i') : '-';
+                            $visitor = htmlspecialchars($meeting['visitor_name']);
+                            if (!empty($meeting['visitor_company'])) {
+                                $visitor .= ' · ' . htmlspecialchars($meeting['visitor_company']);
+                            }
+                            $details = [];
+                            if (!empty($meeting['purpose'])) {
+                                $details[] = htmlspecialchars($meeting['purpose']);
+                            }
+                            if (!empty($meeting['notes'])) {
+                                $details[] = nl2br(htmlspecialchars($meeting['notes']));
+                            }
+                        ?>
+                        <tr>
+                            <td><?= $startLabel ?></td>
+                            <td><span class="badge"><?= htmlspecialchars($meeting['status_label']) ?></span></td>
+                            <td><?= $visitor ?></td>
+                            <td>
+                                <?php if ($details): ?>
+                                    <?php foreach ($details as $line): ?>
+                                        <div><?= $line ?></div>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    -
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    <?php endif; ?>
 </section>
 <?php
 include __DIR__ . '/partials/footer.php';

@@ -35,6 +35,28 @@ CREATE TABLE IF NOT EXISTS meeting_logs (
     INDEX idx_meeting_manager_day (manager_id, started_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS scheduled_meetings (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    manager_id INT UNSIGNED NOT NULL,
+    visitor_name VARCHAR(160) NOT NULL,
+    visitor_company VARCHAR(160) NULL,
+    purpose VARCHAR(200) NULL,
+    notes TEXT NULL,
+    scheduled_start DATETIME NOT NULL,
+    scheduled_end DATETIME NULL,
+    status ENUM('planned', 'in_progress', 'completed', 'cancelled') NOT NULL DEFAULT 'planned',
+    created_by INT UNSIGNED NULL,
+    updated_by INT UNSIGNED NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_sched_manager FOREIGN KEY (manager_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT fk_sched_creator FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
+    CONSTRAINT fk_sched_updater FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL,
+    INDEX idx_sched_start (scheduled_start),
+    INDEX idx_sched_status (status),
+    INDEX idx_sched_manager_time (manager_id, scheduled_start)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS announcements (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     title VARCHAR(255) NOT NULL,

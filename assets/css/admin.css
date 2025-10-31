@@ -123,6 +123,12 @@ body {
     font-size: 0.85rem;
 }
 
+.table-subtext {
+    font-size: 0.85rem;
+    color: var(--gap-muted);
+    margin-top: 4px;
+}
+
 .badge {
     display: inline-flex;
     padding: 4px 10px;

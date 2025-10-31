@@ -120,6 +120,12 @@ function renderManagers(managers) {
     container.innerHTML = '';
     signageState.countdownTimers.forEach((timer) => clearInterval(timer));
     signageState.countdownTimers = [];
+    const referenceDate = signageState.dataTimestamp ? new Date(signageState.dataTimestamp) : new Date();
+    const isSameDay = (dateA, dateB) => (
+        dateA.getFullYear() === dateB.getFullYear()
+        && dateA.getMonth() === dateB.getMonth()
+        && dateA.getDate() === dateB.getDate()
+    );
     if (!managers || managers.length === 0) {
         const empty = document.createElement('div');
         empty.className = 'manager-card';
@@ -158,6 +164,70 @@ function renderManagers(managers) {
             note.className = 'status-note';
             note.textContent = manager.note;
             card.appendChild(note);
+        }
+
+        if (manager.nextMeeting) {
+            const meeting = manager.nextMeeting;
+            const meetingBox = document.createElement('div');
+            const statusClass = meeting.status ? meeting.status.replace(/_/g, '-') : '';
+            meetingBox.className = `next-meeting${statusClass ? ` ${statusClass}` : ''}`;
+
+            const label = document.createElement('div');
+            label.className = 'next-meeting__label';
+            label.textContent = meeting.statusLabel || 'Planlı Görüşme';
+            meetingBox.appendChild(label);
+
+            const who = document.createElement('div');
+            who.className = 'next-meeting__who';
+            const whoParts = [];
+            if (meeting.visitorName) {
+                whoParts.push(meeting.visitorName);
+            }
+            if (meeting.visitorCompany) {
+                whoParts.push(meeting.visitorCompany);
+            }
+            who.textContent = whoParts.join(' · ') || 'Misafir';
+            meetingBox.appendChild(who);
+
+            const startIso = meeting.scheduledStartIso || meeting.scheduledStart;
+            const timeEl = document.createElement('div');
+            timeEl.className = 'next-meeting__time';
+            let timeText = meeting.scheduledStart || '';
+            if (startIso) {
+                const startDate = new Date(startIso);
+                if (!Number.isNaN(startDate.getTime())) {
+                    const timeString = startDate.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+                    if (meeting.status === 'in_progress') {
+                        timeText = `Şimdi · ${timeString}`;
+                    } else if (meeting.isToday === true || (meeting.isToday === null && isSameDay(startDate, referenceDate))) {
+                        timeText = `Bugün · ${timeString}`;
+                    } else {
+                        const dateString = startDate.toLocaleDateString('tr-TR', {
+                            weekday: 'long',
+                            day: '2-digit',
+                            month: 'long',
+                        });
+                        timeText = `${dateString} · ${timeString}`;
+                    }
+                }
+            }
+            timeEl.textContent = timeText;
+            meetingBox.appendChild(timeEl);
+
+            if (meeting.purpose) {
+                const purpose = document.createElement('div');
+                purpose.className = 'next-meeting__purpose';
+                purpose.textContent = meeting.purpose;
+                meetingBox.appendChild(purpose);
+            }
+            if (meeting.notes) {
+                const notes = document.createElement('div');
+                notes.className = 'next-meeting__purpose';
+                notes.textContent = meeting.notes;
+                meetingBox.appendChild(notes);
+            }
+
+            card.appendChild(meetingBox);
         }
 
         if (manager.remainingSeconds !== null) {

@@ -4,10 +4,12 @@ Gapgross idari binası için geliştirilen bu proje, satınalma müdürlerinin d
 
 ## Başlıca Özellikler
 
-- **Roller:** `super_admin`, `boss`, `manager`, `viewer` rollerine göre yetkilendirme.
+- **Roller:** `super_admin`, `boss`, `manager`, `finance`, `accounting`, `secretary`, `viewer` rollerine göre yetkilendirme.
 - **Signage ekranı:** Portre (1080×1920) uyumlu tek sayfa; kurum logosu, saat/tarih, satınalma müdür kartları, duyurular, organigram modali ve kayan yazı alanı.
 - **Tam ekran medya:** Zamanlanmış resim/video yayınları; aktif olduğunda tüm ekranı kaplayarak oynatılır.
 - **Durum yönetimi:** Müdür kartlarında müsaitlik, toplantı geri sayımı, yemek ve izin durumları.
+- **Planlı görüşme ajandası:** Sekreter panelinden tüm yöneticiler için görüşme planlama, durum güncelleme ve geçmiş kayıt takibi; yöneticiler kendi yaklaşan görüşmelerini görebilir.
+- **Sekreter çalışma alanı:** Toplu durum değişikliği, günlük yemek molası saatleri, duyuru ve kayan yazı yönetimi tek ekranda.
 - **Duyuru & ticker yönetimi:** Metin bazlı duyurular, kayan yazı öğeleri, öncelik ve tarih aralıklarıyla planlama.
 - **Zamanlanmış uyarılar:** Yemek molası gibi kurumsal uyarılar için zaman penceresi tanımlama.
 - **Raporlama:** Günlük toplantı raporu (boss rolü) ve manuel durum yönetimi (super admin).

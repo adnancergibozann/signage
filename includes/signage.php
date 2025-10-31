@@ -54,13 +54,16 @@ function fetch_managers_with_status(PDO $pdo, DateTimeImmutable $now, array $set
         WHERE u.role IN ($placeholders)
         ORDER BY u.full_name");
     $stmt->execute($managerRoles);
+    $rows = $stmt->fetchAll();
 
+    $managerIds = array_map(static fn (array $row): int => (int) $row['id'], $rows);
+    $nextMeetings = fetch_next_meetings_for_managers($pdo, $managerIds, $now);
     $managers = [];
     $lunchWindow = current_lunch_window($settings, $now);
     $lunchEndsAt = $lunchWindow ? $lunchWindow['end']->format('Y-m-d H:i:s') : null;
     $lunchStartsAt = $lunchWindow ? $lunchWindow['start']->format('Y-m-d H:i:s') : null;
     $lunchRemaining = $lunchWindow ? max(0, $lunchWindow['end']->getTimestamp() - $now->getTimestamp()) : null;
-    foreach ($stmt as $row) {
+    foreach ($rows as $row) {
         $status = $row['status'] ?? 'available';
         $endsAt = $row['state_ends_at'];
         $remainingSeconds = null;
@@ -75,8 +78,48 @@ function fetch_managers_with_status(PDO $pdo, DateTimeImmutable $now, array $set
             $remainingSeconds = $diff > 0 ? $diff : 0;
         }
 
+        $managerId = (int) $row['id'];
+        $nextMeeting = $nextMeetings[$managerId] ?? null;
+        $nextMeetingData = null;
+        if ($nextMeeting) {
+            try {
+                $start = new DateTimeImmutable($nextMeeting['scheduledStart']);
+            } catch (Throwable) {
+                $start = null;
+            }
+            $startIso = $start ? $start->format(DateTimeInterface::ATOM) : $nextMeeting['scheduledStart'];
+            $endIso = null;
+            if (!empty($nextMeeting['scheduledEnd'])) {
+                try {
+                    $endIso = (new DateTimeImmutable($nextMeeting['scheduledEnd']))->format(DateTimeInterface::ATOM);
+                } catch (Throwable) {
+                    $endIso = $nextMeeting['scheduledEnd'];
+                }
+            }
+            $startsInSeconds = null;
+            if ($start) {
+                $startsInSeconds = $start->getTimestamp() - $now->getTimestamp();
+            }
+
+            $nextMeetingData = [
+                'id' => $nextMeeting['id'],
+                'status' => $nextMeeting['status'],
+                'statusLabel' => $nextMeeting['statusLabel'],
+                'visitorName' => $nextMeeting['visitorName'],
+                'visitorCompany' => $nextMeeting['visitorCompany'],
+                'purpose' => $nextMeeting['purpose'],
+                'notes' => $nextMeeting['notes'],
+                'scheduledStart' => $nextMeeting['scheduledStart'],
+                'scheduledStartIso' => $startIso,
+                'scheduledEnd' => $nextMeeting['scheduledEnd'],
+                'scheduledEndIso' => $endIso,
+                'startsInSeconds' => $startsInSeconds !== null ? (int) $startsInSeconds : null,
+                'isToday' => $start ? $start->format('Y-m-d') === $now->format('Y-m-d') : null,
+            ];
+        }
+
         $managers[] = [
-            'id' => (int) $row['id'],
+            'id' => $managerId,
             'name' => $row['full_name'],
             'department' => $row['department'],
             'role' => $row['role'],
@@ -87,6 +130,7 @@ function fetch_managers_with_status(PDO $pdo, DateTimeImmutable $now, array $set
             'remainingSeconds' => $remainingSeconds,
             'endsAt' => $endsAt,
             'startedAt' => $startedAt,
+            'nextMeeting' => $nextMeetingData,
         ];
     }
 

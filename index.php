@@ -63,6 +63,7 @@ $signageJs = asset_url('assets/js/signage.js?v=1');
                                 $photo = $manager['photoUrl'] ? htmlspecialchars($manager['photoUrl'], ENT_QUOTES) : $placeholderProfile;
                                 $note = $manager['note'] ?? null;
                                 $remaining = $manager['remainingSeconds'] ?? null;
+                                $nextMeeting = $manager['nextMeeting'] ?? null;
                                 $cardAttrs = sprintf('class="manager-card %s" data-status-label="%s"', $statusClass, $statusLabel);
                             ?>
                             <article <?= $cardAttrs ?>>
@@ -75,6 +76,48 @@ $signageJs = asset_url('assets/js/signage.js?v=1');
                                 </div>
                                 <?php if ($note): ?>
                                     <div class="status-note"><?= htmlspecialchars($note) ?></div>
+                                <?php endif; ?>
+                                <?php if ($nextMeeting): ?>
+                                    <?php
+                                        $meetingStatus = $nextMeeting['status'] ?? '';
+                                        $meetingClass = $meetingStatus ? ' ' . htmlspecialchars(str_replace('_', '-', $meetingStatus)) : '';
+                                        $meetingLabel = htmlspecialchars($nextMeeting['statusLabel'] ?? 'Planlı Görüşme');
+                                        $visitorName = htmlspecialchars($nextMeeting['visitorName'] ?? 'Misafir');
+                                        $visitorCompany = $nextMeeting['visitorCompany'] ? htmlspecialchars($nextMeeting['visitorCompany']) : null;
+                                        $startText = '';
+                                        $rawStart = $nextMeeting['scheduledStart'] ?? null;
+                                        if ($rawStart) {
+                                            try {
+                                                $meetingStart = new DateTimeImmutable($rawStart);
+                                                if ($meetingStatus === 'in_progress') {
+                                                    $startText = 'Şimdi · ' . $meetingStart->format('H:i');
+                                                } elseif ($meetingStart->format('Y-m-d') === $timestamp->format('Y-m-d')) {
+                                                    $startText = 'Bugün · ' . $meetingStart->format('H:i');
+                                                } else {
+                                                    $startText = $meetingStart->format('d.m Y · H:i');
+                                                }
+                                            } catch (Throwable) {
+                                                $startText = $rawStart;
+                                            }
+                                        }
+                                        $purpose = $nextMeeting['purpose'] ?? '';
+                                        $meetingNote = $nextMeeting['notes'] ?? '';
+                                    ?>
+                                    <div class="next-meeting<?= $meetingClass ?>">
+                                        <div class="next-meeting__label"><?= $meetingLabel ?></div>
+                                        <div class="next-meeting__who">
+                                            <?= $visitorName ?><?php if ($visitorCompany): ?> · <?= $visitorCompany ?><?php endif; ?>
+                                        </div>
+                                        <?php if ($startText !== ''): ?>
+                                            <div class="next-meeting__time"><?= htmlspecialchars($startText) ?></div>
+                                        <?php endif; ?>
+                                        <?php if ($purpose): ?>
+                                            <div class="next-meeting__purpose"><?= htmlspecialchars($purpose) ?></div>
+                                        <?php endif; ?>
+                                        <?php if ($meetingNote): ?>
+                                            <div class="next-meeting__purpose"><?= htmlspecialchars($meetingNote) ?></div>
+                                        <?php endif; ?>
+                                    </div>
                                 <?php endif; ?>
                                 <?php if ($remaining !== null): ?>
                                     <div class="countdown">
