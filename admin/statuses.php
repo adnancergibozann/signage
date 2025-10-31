@@ -11,6 +11,7 @@ require_role('super_admin');
 $pageTitle = 'Durum Yönetimi';
 $activePage = 'statuses';
 $pdo = get_pdo();
+$settings = load_all_settings();
 $message = null;
 $error = null;
 
@@ -38,7 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$managers = fetch_managers_with_status($pdo, new DateTimeImmutable());
+$managers = fetch_managers_with_status($pdo, new DateTimeImmutable(), $settings);
 
 include __DIR__ . '/partials/header.php';
 ?>

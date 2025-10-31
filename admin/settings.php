@@ -22,8 +22,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         set_setting('signage_refresh_seconds', (string) (int) ($_POST['refresh_seconds'] ?? 5));
         set_setting('time_format', $_POST['time_format'] ?? '24h');
         set_setting('ticker_speed', (string) (int) ($_POST['ticker_speed'] ?? 40));
-        set_setting('lunch_notice_start', parse_datetime_local($_POST['lunch_notice_start'] ?? '') ?: '');
-        set_setting('lunch_notice_end', parse_datetime_local($_POST['lunch_notice_end'] ?? '') ?: '');
+
+        $lunchStartInput = $_POST['lunch_notice_start'] ?? '';
+        $lunchEndInput = $_POST['lunch_notice_end'] ?? '';
+        $lunchStart = $lunchStartInput === '' ? null : extract_time_component($lunchStartInput);
+        $lunchEnd = $lunchEndInput === '' ? null : extract_time_component($lunchEndInput);
+        if ($lunchStartInput !== '' && !$lunchStart) {
+            throw new RuntimeException('Yemek uyarısı başlangıç saati geçersiz.');
+        }
+        if ($lunchEndInput !== '' && !$lunchEnd) {
+            throw new RuntimeException('Yemek uyarısı bitiş saati geçersiz.');
+        }
+        set_setting('lunch_notice_start', $lunchStart ?? '');
+        set_setting('lunch_notice_end', $lunchEnd ?? '');
 
         if (!empty($_FILES['logo']['name'])) {
             $file = upload_file(
@@ -101,12 +112,12 @@ include __DIR__ . '/partials/header.php';
                 </select>
             </div>
             <div>
-                <label for="lunch_notice_start">Yemek Uyarısı Başlangıç</label>
-                <input type="datetime-local" id="lunch_notice_start" name="lunch_notice_start" value="<?= !empty($currentSettings['lunch_notice_start']) ? (new DateTime($currentSettings['lunch_notice_start']))->format('Y-m-d\TH:i') : '' ?>">
+                <label for="lunch_notice_start">Yemek Uyarısı Başlangıç Saati</label>
+                <input type="time" id="lunch_notice_start" name="lunch_notice_start" value="<?= htmlspecialchars(extract_time_component($currentSettings['lunch_notice_start'] ?? '') ?? '') ?>">
             </div>
             <div>
-                <label for="lunch_notice_end">Yemek Uyarısı Bitiş</label>
-                <input type="datetime-local" id="lunch_notice_end" name="lunch_notice_end" value="<?= !empty($currentSettings['lunch_notice_end']) ? (new DateTime($currentSettings['lunch_notice_end']))->format('Y-m-d\TH:i') : '' ?>">
+                <label for="lunch_notice_end">Yemek Uyarısı Bitiş Saati</label>
+                <input type="time" id="lunch_notice_end" name="lunch_notice_end" value="<?= htmlspecialchars(extract_time_component($currentSettings['lunch_notice_end'] ?? '') ?? '') ?>">
             </div>
             <div>
                 <label for="logo">Logo</label>

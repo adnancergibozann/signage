@@ -15,7 +15,8 @@ $pageTitle = 'Gösterge Paneli';
 $activePage = 'dashboard';
 $pdo = get_pdo();
 $now = new DateTimeImmutable();
-$managers = fetch_managers_with_status($pdo, $now);
+$settings = load_all_settings();
+$managers = fetch_managers_with_status($pdo, $now, $settings);
 
 $meetingStmt = $pdo->prepare('SELECT ml.id, u.full_name, ml.started_at, ml.expected_end_at, ml.ended_at, ml.note
     FROM meeting_logs ml

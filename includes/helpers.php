@@ -171,6 +171,26 @@ function parse_datetime_local(string $value): ?string
     }
 }
 
+function extract_time_component(?string $value): ?string
+{
+    if ($value === null) {
+        return null;
+    }
+    $value = trim($value);
+    if ($value === '') {
+        return null;
+    }
+    if (preg_match('/^\d{2}:\d{2}$/', $value) === 1) {
+        return $value;
+    }
+    try {
+        $dt = new DateTime($value);
+        return $dt->format('H:i');
+    } catch (Exception) {
+        return null;
+    }
+}
+
 function active_between(?string $startsAt, ?string $endsAt, DateTimeImmutable $now): bool
 {
     if ($startsAt && $now < new DateTimeImmutable($startsAt)) {

@@ -11,6 +11,7 @@ require_role('manager');
 $pageTitle = 'Durum Yönetimim';
 $activePage = 'manager';
 $pdo = get_pdo();
+$settings = load_all_settings();
 $user = current_user();
 $message = null;
 $error = null;
@@ -77,7 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $managerData = null;
-foreach (fetch_managers_with_status($pdo, new DateTimeImmutable()) as $manager) {
+foreach (fetch_managers_with_status($pdo, new DateTimeImmutable(), $settings) as $manager) {
     if ($manager['id'] === $user['id']) {
         $managerData = $manager;
         break;

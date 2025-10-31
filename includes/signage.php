@@ -16,7 +16,7 @@ function fetch_signage_state(): array
     $secondary = $settings['theme_secondary'] ?? config_value('theme.secondary');
     $tickerSpeed = (int)($settings['ticker_speed'] ?? 40);
 
-    $managers = fetch_managers_with_status($pdo, $now);
+    $managers = fetch_managers_with_status($pdo, $now, $settings);
     $announcements = fetch_active_announcements($pdo, $now);
     $tickers = fetch_active_tickers($pdo, $now);
     $media = find_active_media($pdo, $now);
@@ -42,7 +42,7 @@ function fetch_signage_state(): array
     ];
 }
 
-function fetch_managers_with_status(PDO $pdo, DateTimeImmutable $now): array
+function fetch_managers_with_status(PDO $pdo, DateTimeImmutable $now, array $settings = []): array
 {
     $stmt = $pdo->query('SELECT u.id, u.full_name, u.department, u.photo_path, s.status, s.state_started_at, s.state_ends_at, s.note
         FROM users u
@@ -51,11 +51,21 @@ function fetch_managers_with_status(PDO $pdo, DateTimeImmutable $now): array
         ORDER BY u.full_name');
 
     $managers = [];
+    $lunchWindow = current_lunch_window($settings, $now);
+    $lunchEndsAt = $lunchWindow ? $lunchWindow['end']->format('Y-m-d H:i:s') : null;
+    $lunchStartsAt = $lunchWindow ? $lunchWindow['start']->format('Y-m-d H:i:s') : null;
+    $lunchRemaining = $lunchWindow ? max(0, $lunchWindow['end']->getTimestamp() - $now->getTimestamp()) : null;
     foreach ($stmt as $row) {
         $status = $row['status'] ?? 'available';
         $endsAt = $row['state_ends_at'];
         $remainingSeconds = null;
-        if ($endsAt) {
+        $startedAt = $row['state_started_at'];
+        if ($lunchWindow) {
+            $status = 'lunch';
+            $endsAt = $lunchEndsAt;
+            $remainingSeconds = $lunchRemaining;
+            $startedAt = $lunchStartsAt;
+        } elseif ($endsAt) {
             $diff = (new DateTimeImmutable($endsAt))->getTimestamp() - $now->getTimestamp();
             $remainingSeconds = $diff > 0 ? $diff : 0;
         }
@@ -68,9 +78,9 @@ function fetch_managers_with_status(PDO $pdo, DateTimeImmutable $now): array
             'statusLabel' => map_status_label($status),
             'photoUrl' => $row['photo_path'] ? asset_url('public/uploads/profile/' . $row['photo_path']) : null,
             'note' => $row['note'],
-            'remainingSeconds' => $status === 'meeting' ? $remainingSeconds : null,
+            'remainingSeconds' => $status === 'meeting' ? $remainingSeconds : ($status === 'lunch' ? $remainingSeconds : null),
             'endsAt' => $endsAt,
-            'startedAt' => $row['state_started_at'],
+            'startedAt' => $startedAt,
         ];
     }
 
@@ -141,15 +151,51 @@ function find_active_media(PDO $pdo, DateTimeImmutable $now): ?array
 function build_alerts(array $settings, DateTimeImmutable $now): array
 {
     $alerts = [];
-    if (!empty($settings['lunch_notice_start']) && !empty($settings['lunch_notice_end'])) {
-        $start = new DateTimeImmutable($settings['lunch_notice_start']);
-        $end = new DateTimeImmutable($settings['lunch_notice_end']);
-        if ($now >= $start && $now <= $end) {
-            $alerts[] = [
-                'type' => 'lunch',
-                'message' => 'Belirlenen yemek molası saatindeyiz.',
-            ];
-        }
+    if (current_lunch_window($settings, $now)) {
+        $alerts[] = [
+            'type' => 'lunch',
+            'message' => 'Belirlenen yemek molası saatindeyiz.',
+        ];
     }
     return $alerts;
+}
+
+function current_lunch_window(array $settings, DateTimeImmutable $now): ?array
+{
+    $startTime = extract_time_component($settings['lunch_notice_start'] ?? null);
+    $endTime = extract_time_component($settings['lunch_notice_end'] ?? null);
+    if (!$startTime || !$endTime) {
+        return null;
+    }
+
+    [$startHour, $startMinute] = array_map('intval', explode(':', $startTime));
+    [$endHour, $endMinute] = array_map('intval', explode(':', $endTime));
+
+    $tz = $now->getTimezone();
+    $baseDate = $now->format('Y-m-d');
+    $start = DateTimeImmutable::createFromFormat('Y-m-d H:i', sprintf('%s %02d:%02d', $baseDate, $startHour, $startMinute), $tz);
+    $end = DateTimeImmutable::createFromFormat('Y-m-d H:i', sprintf('%s %02d:%02d', $baseDate, $endHour, $endMinute), $tz);
+    if (!$start || !$end) {
+        return null;
+    }
+
+    if ($end <= $start) {
+        $end = $end->modify('+1 day');
+        if ($now < $start) {
+            $start = $start->modify('-1 day');
+            $end = $end->modify('-1 day');
+        }
+    }
+
+    if ($now < $start) {
+        return null;
+    }
+    if ($now > $end) {
+        return null;
+    }
+
+    return [
+        'start' => $start,
+        'end' => $end,
+    ];
 }
