@@ -21,7 +21,7 @@ $navItems = [
     <meta charset="UTF-8">
     <title><?= htmlspecialchars($pageTitle ?? 'Yönetim Paneli') ?> · Gapgross</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="/assets/css/admin.css?v=1">
+    <link rel="stylesheet" href="<?= asset_url('assets/css/admin.css?v=1') ?>">
 </head>
 <body>
 <div class="layout">
@@ -30,7 +30,7 @@ $navItems = [
         <nav class="nav-links">
             <?php foreach ($navItems as $item): ?>
                 <?php if (in_array($role, $item['roles'], true)): ?>
-                    <a href="<?= $item['href'] ?>" class="<?= ($activePage ?? '') === $item['key'] ? 'active' : '' ?>">
+                    <a href="<?= url_for($item['href']) ?>" class="<?= ($activePage ?? '') === $item['key'] ? 'active' : '' ?>">
                         <?= htmlspecialchars($item['label']) ?>
                     </a>
                 <?php endif; ?>
@@ -39,7 +39,7 @@ $navItems = [
         <div class="nav-footer">
             <div><?= htmlspecialchars($user['full_name'] ?? '') ?></div>
             <small><?= htmlspecialchars($user['role'] ?? '') ?></small>
-            <a class="button secondary" href="/admin/logout.php">Çıkış Yap</a>
+            <a class="button secondary" href="<?= url_for('admin/logout.php') ?>">Çıkış Yap</a>
         </div>
     </aside>
     <main class="content">

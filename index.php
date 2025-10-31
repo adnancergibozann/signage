@@ -17,6 +17,10 @@ $secondary = htmlspecialchars($settings['secondaryColor'], ENT_QUOTES);
 $tickerSpeed = (int) ($settings['tickerSpeed'] ?? 35);
 $logoUrl = $settings['logoUrl'] ?? null;
 $organigramUrl = $settings['organigramUrl'] ?? null;
+$baseUri = base_uri();
+$placeholderProfile = asset_url('assets/placeholder-profile.svg');
+$signageCss = asset_url('assets/css/signage.css?v=1');
+$signageJs = asset_url('assets/js/signage.js?v=1');
 ?>
 <!DOCTYPE html>
 <html lang="tr">
@@ -24,7 +28,7 @@ $organigramUrl = $settings['organigramUrl'] ?? null;
     <meta charset="UTF-8">
     <title>Gapgross Signage</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="/assets/css/signage.css?v=1">
+    <link rel="stylesheet" href="<?= $signageCss ?>">
     <style>
         :root {
             --gap-primary: <?= $primary ?>;
@@ -37,7 +41,7 @@ $organigramUrl = $settings['organigramUrl'] ?? null;
     <main class="signage-canvas" role="main">
         <section class="header-bar">
             <div class="branding">
-                <img src="<?= $logoUrl ? htmlspecialchars($logoUrl, ENT_QUOTES) : '/assets/placeholder-profile.svg' ?>" alt="Gapgross"<?= $logoUrl ? '' : ' style="display:none"' ?>>
+                <img src="<?= $logoUrl ? htmlspecialchars($logoUrl, ENT_QUOTES) : $placeholderProfile ?>" alt="Gapgross"<?= $logoUrl ? '' : ' style="display:none"' ?>>
                 <h1><?= htmlspecialchars($settings['companyName'] ?? 'Gapgross') ?></h1>
             </div>
             <div class="clock" aria-live="polite">
@@ -56,7 +60,7 @@ $organigramUrl = $settings['organigramUrl'] ?? null;
                             <?php
                                 $statusClass = htmlspecialchars($manager['status']);
                                 $statusLabel = htmlspecialchars($manager['statusLabel']);
-                                $photo = $manager['photoUrl'] ? htmlspecialchars($manager['photoUrl'], ENT_QUOTES) : '/assets/placeholder-profile.svg';
+                                $photo = $manager['photoUrl'] ? htmlspecialchars($manager['photoUrl'], ENT_QUOTES) : $placeholderProfile;
                                 $note = $manager['note'] ?? null;
                                 $remaining = $manager['remainingSeconds'] ?? null;
                                 $cardAttrs = sprintf('class="manager-card %s" data-status-label="%s"', $statusClass, $statusLabel);
@@ -141,6 +145,10 @@ $organigramUrl = $settings['organigramUrl'] ?? null;
         </div>
     </main>
 
-    <script src="/assets/js/signage.js?v=1" defer></script>
+    <script>
+        window.APP_BASE_PATH = <?= json_encode($baseUri, JSON_UNESCAPED_SLASHES) ?>;
+        window.APP_PLACEHOLDER_PHOTO = <?= json_encode($placeholderProfile, JSON_UNESCAPED_SLASHES) ?>;
+    </script>
+    <script src="<?= $signageJs ?>" defer></script>
 </body>
 </html>

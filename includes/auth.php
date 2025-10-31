@@ -9,7 +9,7 @@ function current_user(): ?array
 function require_login(): void
 {
     if (!current_user()) {
-        header('Location: /admin/login.php');
+        header('Location: ' . url_for('admin/login.php'));
         exit;
     }
 }

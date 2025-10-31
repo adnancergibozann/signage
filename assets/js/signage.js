@@ -1,3 +1,29 @@
+const BASE_PATH = window.APP_BASE_PATH || '';
+const PLACEHOLDER_PHOTO = window.APP_PLACEHOLDER_PHOTO
+    || (BASE_PATH ? `${BASE_PATH}/assets/placeholder-profile.svg` : '/assets/placeholder-profile.svg');
+
+function withBase(path) {
+    if (!path) {
+        return path;
+    }
+    if (typeof path !== 'string') {
+        return path;
+    }
+    const lower = path.toLowerCase();
+    if (lower.startsWith('http://') || lower.startsWith('https://') || lower.startsWith('//') || lower.startsWith('data:')) {
+        return path;
+    }
+    if (BASE_PATH && path.startsWith(BASE_PATH)) {
+        return path;
+    }
+    if (BASE_PATH) {
+        const trimmed = path.startsWith('/') ? path.slice(1) : path;
+        const prefix = BASE_PATH.endsWith('/') ? BASE_PATH.slice(0, -1) : BASE_PATH;
+        return `${prefix}/${trimmed}`;
+    }
+    return path.startsWith('/') ? path : `/${path}`;
+}
+
 const signageState = {
     refreshTimer: null,
     refreshSeconds: 5,
@@ -10,7 +36,7 @@ const signageState = {
 
 async function loadSignageState() {
     try {
-        const response = await fetch('/public/api/signage.php', { cache: 'no-store' });
+        const response = await fetch(withBase('/public/api/signage.php'), { cache: 'no-store' });
         if (!response.ok) {
             throw new Error('Veri alınamadı');
         }
@@ -51,7 +77,7 @@ function applyTheme(settings) {
     root.style.setProperty('--gap-secondary', settings.secondaryColor);
     const logo = document.querySelector('.branding img');
     if (settings.logoUrl && logo) {
-        logo.src = settings.logoUrl;
+        logo.src = withBase(settings.logoUrl);
         logo.style.display = 'block';
     } else if (logo) {
         logo.style.display = 'none';
@@ -111,7 +137,8 @@ function renderManagers(managers) {
         header.className = 'manager-header';
         const photo = document.createElement('img');
         photo.className = 'manager-photo';
-        photo.src = manager.photoUrl || '/assets/placeholder-profile.svg';
+        const photoUrl = manager.photoUrl ? withBase(manager.photoUrl) : PLACEHOLDER_PHOTO;
+        photo.src = photoUrl;
         photo.alt = manager.name;
         header.appendChild(photo);
 
@@ -230,13 +257,13 @@ function renderMedia(media) {
     let node;
     if (media.type === 'video') {
         node = document.createElement('video');
-        node.src = media.url;
+        node.src = withBase(media.url);
         node.autoplay = true;
         node.loop = false;
         node.controls = false;
     } else {
         node = document.createElement('img');
-        node.src = media.url;
+        node.src = withBase(media.url);
         node.alt = media.title;
     }
     overlay.appendChild(node);
@@ -258,7 +285,7 @@ function setupOrganigram(url) {
     }
     button.style.display = 'inline-flex';
     const image = modal.querySelector('img');
-    image.src = url;
+    image.src = withBase(url);
     button.onclick = () => modal.classList.add('active');
     modal.querySelector('button').onclick = () => modal.classList.remove('active');
     if (!modal.dataset.bound) {

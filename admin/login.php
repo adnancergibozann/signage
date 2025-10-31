@@ -27,10 +27,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 function default_dashboard_route(string $role): string
 {
     return match ($role) {
-        'manager' => '/admin/manager.php',
-        'boss' => '/admin/dashboard.php',
-        'super_admin' => '/admin/dashboard.php',
-        default => '/index.php',
+        'manager' => url_for('admin/manager.php'),
+        'boss' => url_for('admin/dashboard.php'),
+        'super_admin' => url_for('admin/dashboard.php'),
+        default => url_for('index.php'),
     };
 }
 ?>
@@ -40,7 +40,7 @@ function default_dashboard_route(string $role): string
     <meta charset="UTF-8">
     <title>Gapgross Yönetim Girişi</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="/assets/css/admin.css?v=1">
+    <link rel="stylesheet" href="<?= asset_url('assets/css/admin.css?v=1') ?>">
     <style>
         body { display: flex; justify-content: center; align-items: center; }
         .login-card {

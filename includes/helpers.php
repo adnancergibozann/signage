@@ -26,9 +26,50 @@ function ensure_directory(string $path): void
     }
 }
 
+function base_uri(): string
+{
+    $basePath = config_value('app.base_path', '');
+    if ($basePath === null || $basePath === '') {
+        return '';
+    }
+
+    $normalized = '/' . ltrim($basePath, '/');
+    return rtrim($normalized, '/') ?: '';
+}
+
+function url_for(string $path = ''): string
+{
+    if ($path === '') {
+        $normalized = '/';
+    } else {
+        $normalized = '/' . ltrim($path, '/');
+    }
+
+    if (preg_match('#^(?:[a-z][a-z0-9+.-]*:)?//#i', $path)) {
+        return $path;
+    }
+
+    $base = base_uri();
+
+    if ($base !== '' && ($normalized === $base || str_starts_with($normalized, $base . '/'))) {
+        return $normalized;
+    }
+
+    if ($base === '' || $normalized === '/') {
+        return $base . $normalized;
+    }
+
+    return $base . $normalized;
+}
+
 function asset_url(string $relativePath): string
 {
-    return '/' . ltrim($relativePath, '/');
+    if (preg_match('#^(?:[a-z][a-z0-9+.-]*:)?//#i', $relativePath)) {
+        return $relativePath;
+    }
+
+    $path = ltrim($relativePath, '/');
+    return url_for($path);
 }
 
 function public_path(string $relativePath): string

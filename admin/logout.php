@@ -5,5 +5,5 @@ require __DIR__ . '/../includes/bootstrap.php';
 
 logout();
 
-header('Location: /admin/login.php');
+header('Location: ' . url_for('admin/login.php'));
 exit;

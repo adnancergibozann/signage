@@ -7,7 +7,7 @@ require __DIR__ . '/../includes/signage.php';
 require_login();
 $user = current_user();
 if ($user['role'] === 'manager') {
-    header('Location: /admin/manager.php');
+    header('Location: ' . url_for('admin/manager.php'));
     exit;
 }
 
