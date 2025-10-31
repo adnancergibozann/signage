@@ -11,6 +11,8 @@ if (is_manager_role($user['role'])) {
     exit;
 }
 
+require_role(['super_admin', 'boss']);
+
 $pageTitle = 'Gösterge Paneli';
 $activePage = 'dashboard';
 $pdo = get_pdo();

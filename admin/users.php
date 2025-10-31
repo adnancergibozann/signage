@@ -15,6 +15,7 @@ $roleOptions = [
     'manager' => 'Satınalma Müdürü',
     'finance' => 'Finans',
     'accounting' => 'Muhasebe',
+    'secretary' => 'Sekreter',
     'boss' => 'Patron',
     'super_admin' => 'Süper Admin',
     'viewer' => 'Signage İzleyici',
@@ -174,7 +175,7 @@ function handle_create_user(PDO $pdo): string
     $password = $_POST['password'] ?? '';
     $fullName = trim($_POST['full_name'] ?? '');
     $role = $_POST['role'] ?? 'manager';
-    $allowedRoles = ['manager', 'finance', 'accounting', 'boss', 'super_admin', 'viewer'];
+    $allowedRoles = ['manager', 'finance', 'accounting', 'secretary', 'boss', 'super_admin', 'viewer'];
     if ($username === '' || $password === '' || $fullName === '') {
         throw new RuntimeException('Zorunlu alanlar eksik.');
     }
@@ -248,7 +249,7 @@ function handle_update_user(PDO $pdo): string
         'id' => $id,
     ];
 
-    $allowedRoles = ['manager', 'finance', 'accounting', 'boss', 'super_admin', 'viewer'];
+    $allowedRoles = ['manager', 'finance', 'accounting', 'secretary', 'boss', 'super_admin', 'viewer'];
     if (!in_array($updateFields['role'], $allowedRoles, true)) {
         throw new RuntimeException('Geçersiz rol seçimi.');
     }

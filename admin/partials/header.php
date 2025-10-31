@@ -8,6 +8,7 @@ $navItems = [
     ['key' => 'dashboard', 'label' => 'Gösterge Paneli', 'href' => '/admin/dashboard.php', 'roles' => ['super_admin', 'boss', 'manager']],
     ['key' => 'users', 'label' => 'Kullanıcılar', 'href' => '/admin/users.php', 'roles' => ['super_admin']],
     ['key' => 'statuses', 'label' => 'Durum Yönetimi', 'href' => '/admin/statuses.php', 'roles' => ['super_admin']],
+    ['key' => 'secretary', 'label' => 'Sekreter Paneli', 'href' => '/admin/secretary.php', 'roles' => ['super_admin', 'secretary']],
     ['key' => 'announcements', 'label' => 'Duyurular', 'href' => '/admin/announcements.php', 'roles' => ['super_admin']],
     ['key' => 'ticker', 'label' => 'Kayan Yazı', 'href' => '/admin/ticker.php', 'roles' => ['super_admin']],
     ['key' => 'media', 'label' => 'Medya Yayınları', 'href' => '/admin/media.php', 'roles' => ['super_admin']],
@@ -40,7 +41,7 @@ $navItems = [
         </nav>
         <div class="nav-footer">
             <div><?= htmlspecialchars($user['full_name'] ?? '') ?></div>
-            <small><?= htmlspecialchars($user['role'] ?? '') ?></small>
+            <small><?= htmlspecialchars(role_label($user['role'] ?? null)) ?></small>
             <a class="button secondary" href="<?= url_for('admin/logout.php') ?>">Çıkış Yap</a>
         </div>
     </aside>

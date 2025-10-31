@@ -33,6 +33,7 @@ function default_dashboard_route(string $role): string
         'manager', 'finance', 'accounting' => url_for('admin/manager.php'),
         'boss' => url_for('admin/dashboard.php'),
         'super_admin' => url_for('admin/dashboard.php'),
+        'secretary' => url_for('admin/secretary.php'),
         default => url_for('index.php'),
     };
 }

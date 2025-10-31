@@ -77,6 +77,21 @@ function manager_role_keys(): array
     return ['manager', 'finance', 'accounting'];
 }
 
+function role_label(?string $role): string
+{
+    return match ($role) {
+        'super_admin' => 'Süper Admin',
+        'boss' => 'Patron',
+        'manager' => 'Satınalma Müdürü',
+        'finance' => 'Finans',
+        'accounting' => 'Muhasebe',
+        'secretary' => 'Sekreter',
+        'viewer' => 'Signage İzleyici',
+        null => '',
+        default => ucwords(str_replace('_', ' ', (string) $role)),
+    };
+}
+
 function is_manager_role(?string $role): bool
 {
     return $role !== null && in_array($role, manager_role_keys(), true);
