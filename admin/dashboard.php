@@ -6,7 +6,7 @@ require __DIR__ . '/../includes/signage.php';
 
 require_login();
 $user = current_user();
-if ($user['role'] === 'manager') {
+if (is_manager_role($user['role'])) {
     header('Location: ' . url_for('admin/manager.php'));
     exit;
 }
@@ -48,12 +48,12 @@ include __DIR__ . '/partials/header.php';
                 <td><span class="badge"><?= htmlspecialchars($manager['statusLabel']) ?></span></td>
                 <td><?= htmlspecialchars($manager['note'] ?? '') ?></td>
                 <td>
-                    <?php if ($manager['status'] === 'meeting' && $manager['remainingSeconds'] !== null): ?>
+                    <?php if ($manager['remainingSeconds'] !== null): ?>
                         <?= format_duration((int) $manager['remainingSeconds']) ?>
-                    <?php elseif ($manager['status'] === 'lunch' && $manager['endsAt']): ?>
-                        <?= 'Bitiş: ' . format_datetime($manager['endsAt'], 'H:i') ?>
-                    <?php elseif ($manager['status'] === 'leave' && $manager['endsAt']): ?>
-                        <?= 'Dönüş: ' . format_datetime($manager['endsAt'], 'd.m H:i') ?>
+                    <?php elseif ($manager['endsAt']): ?>
+                        <?= format_datetime($manager['endsAt'], 'd.m H:i') ?>
+                    <?php else: ?>
+                        -
                     <?php endif; ?>
                 </td>
             </tr>

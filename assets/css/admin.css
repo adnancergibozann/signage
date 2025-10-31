@@ -223,6 +223,34 @@ form .actions {
     color: #ffb5b5;
 }
 
+.inline-form {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+
+.table-scroll {
+    overflow-x: auto;
+}
+
+.context-list {
+    margin: 0;
+    padding-left: 18px;
+}
+
+.context-list li {
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.75);
+}
+
+.form-help {
+    margin-top: 8px;
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.65);
+}
+
 @media (max-width: 1080px) {
     .layout {
         grid-template-columns: 1fr;

@@ -134,6 +134,15 @@ body {
     color: #080915;
 }
 
+.manager-card.cheque_ready::after {
+    background: linear-gradient(90deg, #1E7A34, #27AE60);
+}
+
+.manager-card.payment_ready::after {
+    background: linear-gradient(90deg, #B8860B, #F1C40F);
+    color: #080915;
+}
+
 .manager-header {
     display: flex;
     gap: 14px;

@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/status.php';
+
 function fetch_signage_state(): array
 {
     $pdo = get_pdo();
@@ -44,11 +46,14 @@ function fetch_signage_state(): array
 
 function fetch_managers_with_status(PDO $pdo, DateTimeImmutable $now, array $settings = []): array
 {
-    $stmt = $pdo->query('SELECT u.id, u.full_name, u.department, u.photo_path, s.status, s.state_started_at, s.state_ends_at, s.note
+    $managerRoles = manager_role_keys();
+    $placeholders = implode(',', array_fill(0, count($managerRoles), '?'));
+    $stmt = $pdo->prepare("SELECT u.id, u.full_name, u.department, u.photo_path, u.role, s.status, s.state_started_at, s.state_ends_at, s.note
         FROM users u
         LEFT JOIN manager_statuses s ON s.user_id = u.id
-        WHERE u.role = "manager"
-        ORDER BY u.full_name');
+        WHERE u.role IN ($placeholders)
+        ORDER BY u.full_name");
+    $stmt->execute($managerRoles);
 
     $managers = [];
     $lunchWindow = current_lunch_window($settings, $now);
@@ -74,29 +79,18 @@ function fetch_managers_with_status(PDO $pdo, DateTimeImmutable $now, array $set
             'id' => (int) $row['id'],
             'name' => $row['full_name'],
             'department' => $row['department'],
+            'role' => $row['role'],
             'status' => $status,
             'statusLabel' => map_status_label($status),
             'photoUrl' => $row['photo_path'] ? asset_url('public/uploads/profile/' . $row['photo_path']) : null,
             'note' => $row['note'],
-            'remainingSeconds' => $status === 'meeting' ? $remainingSeconds : ($status === 'lunch' ? $remainingSeconds : null),
+            'remainingSeconds' => $remainingSeconds,
             'endsAt' => $endsAt,
             'startedAt' => $startedAt,
         ];
     }
 
     return $managers;
-}
-
-function map_status_label(string $status): string
-{
-    return match ($status) {
-        'available' => 'Müsait',
-        'unavailable' => 'Meşgul',
-        'meeting' => 'Toplantıda',
-        'lunch' => 'Yemek Molasında',
-        'leave' => 'İzinli',
-        default => ucfirst($status),
-    };
 }
 
 function fetch_active_announcements(PDO $pdo, DateTimeImmutable $now): array

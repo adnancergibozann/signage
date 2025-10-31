@@ -160,7 +160,7 @@ function renderManagers(managers) {
             card.appendChild(note);
         }
 
-        if (manager.status === 'meeting' && manager.remainingSeconds !== null) {
+        if (manager.remainingSeconds !== null) {
             const countdown = document.createElement('div');
             countdown.className = 'countdown';
             const target = Date.now() + manager.remainingSeconds * 1000;

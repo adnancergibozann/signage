@@ -11,6 +11,14 @@ $activePage = 'users';
 $pdo = get_pdo();
 $message = null;
 $error = null;
+$roleOptions = [
+    'manager' => 'Satınalma Müdürü',
+    'finance' => 'Finans',
+    'accounting' => 'Muhasebe',
+    'boss' => 'Patron',
+    'super_admin' => 'Süper Admin',
+    'viewer' => 'Signage İzleyici',
+];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
@@ -55,10 +63,9 @@ include __DIR__ . '/partials/header.php';
             <div>
                 <label for="role">Rol</label>
                 <select id="role" name="role" required>
-                    <option value="manager">manager</option>
-                    <option value="boss">boss</option>
-                    <option value="super_admin">super_admin</option>
-                    <option value="viewer">viewer</option>
+                    <?php foreach ($roleOptions as $value => $label): ?>
+                        <option value="<?= htmlspecialchars($value) ?>"<?= $value === 'manager' ? ' selected' : '' ?>><?= htmlspecialchars($label) ?></option>
+                    <?php endforeach; ?>
                 </select>
             </div>
             <div>
@@ -103,7 +110,7 @@ include __DIR__ . '/partials/header.php';
             <tr>
                 <td><?= htmlspecialchars($userRow['full_name']) ?></td>
                 <td><?= htmlspecialchars($userRow['username']) ?></td>
-                <td><?= htmlspecialchars($userRow['role']) ?></td>
+                <td><?= htmlspecialchars($roleOptions[$userRow['role']] ?? $userRow['role']) ?></td>
                 <td><?= htmlspecialchars($userRow['department'] ?? '') ?></td>
                 <td><?= htmlspecialchars($userRow['email'] ?? '') ?></td>
                 <td><?= htmlspecialchars($userRow['phone'] ?? '') ?></td>
@@ -118,8 +125,8 @@ include __DIR__ . '/partials/header.php';
                         <div>
                             <label>Rol</label>
                             <select name="role" required>
-                                <?php foreach (['manager','boss','super_admin','viewer'] as $role): ?>
-                                    <option value="<?= $role ?>"<?= $userRow['role'] === $role ? ' selected' : '' ?>><?= $role ?></option>
+                                <?php foreach ($roleOptions as $value => $label): ?>
+                                    <option value="<?= htmlspecialchars($value) ?>"<?= $userRow['role'] === $value ? ' selected' : '' ?>><?= htmlspecialchars($label) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -167,8 +174,12 @@ function handle_create_user(PDO $pdo): string
     $password = $_POST['password'] ?? '';
     $fullName = trim($_POST['full_name'] ?? '');
     $role = $_POST['role'] ?? 'manager';
+    $allowedRoles = ['manager', 'finance', 'accounting', 'boss', 'super_admin', 'viewer'];
     if ($username === '' || $password === '' || $fullName === '') {
         throw new RuntimeException('Zorunlu alanlar eksik.');
+    }
+    if (!in_array($role, $allowedRoles, true)) {
+        throw new RuntimeException('Geçersiz rol seçimi.');
     }
     $photoFilename = null;
     if (!empty($_FILES['photo']['name'])) {
@@ -191,9 +202,13 @@ function handle_create_user(PDO $pdo): string
         'photo_path' => $photoFilename,
     ]);
     $userId = (int) $pdo->lastInsertId();
-    if ($role === 'manager') {
+    if (is_manager_role($role)) {
         ensure_manager_status_row($userId);
     }
+    record_syslog('user.create', sprintf('%s kullanıcısı oluşturuldu.', $username), null, [
+        'targetUserId' => $userId,
+        'role' => $role,
+    ]);
     return 'Kullanıcı eklendi.';
 }
 
@@ -233,6 +248,11 @@ function handle_update_user(PDO $pdo): string
         'id' => $id,
     ];
 
+    $allowedRoles = ['manager', 'finance', 'accounting', 'boss', 'super_admin', 'viewer'];
+    if (!in_array($updateFields['role'], $allowedRoles, true)) {
+        throw new RuntimeException('Geçersiz rol seçimi.');
+    }
+
     $set = 'full_name = :full_name, role = :role, department = :department, email = :email, phone = :phone, photo_path = :photo_path';
     if ($password !== '') {
         $updateFields['password_hash'] = password_hash($password, PASSWORD_BCRYPT);
@@ -242,9 +262,14 @@ function handle_update_user(PDO $pdo): string
     $stmt = $pdo->prepare("UPDATE users SET $set WHERE id = :id");
     $stmt->execute($updateFields);
 
-    if ($updateFields['role'] === 'manager') {
+    if (is_manager_role($updateFields['role'])) {
         ensure_manager_status_row($id);
     }
+
+    record_syslog('user.update', sprintf('%s kullanıcısı güncellendi.', $updateFields['full_name']), null, [
+        'targetUserId' => $id,
+        'role' => $updateFields['role'],
+    ]);
 
     return 'Kullanıcı güncellendi.';
 }
@@ -265,5 +290,8 @@ function handle_delete_user(PDO $pdo): string
         @unlink(public_path('uploads/profile/' . $user['photo_path']));
     }
     $pdo->prepare('DELETE FROM users WHERE id = :id')->execute(['id' => $id]);
+    record_syslog('user.delete', sprintf('ID %d kullanıcısı silindi.', $id), null, [
+        'targetUserId' => $id,
+    ]);
     return 'Kullanıcı silindi.';
 }

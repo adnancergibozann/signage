@@ -76,7 +76,7 @@ $signageJs = asset_url('assets/js/signage.js?v=1');
                                 <?php if ($note): ?>
                                     <div class="status-note"><?= htmlspecialchars($note) ?></div>
                                 <?php endif; ?>
-                                <?php if ($manager['status'] === 'meeting' && $remaining): ?>
+                                <?php if ($remaining !== null): ?>
                                     <div class="countdown">
                                         <?php
                                             $minutes = str_pad((string) intdiv($remaining, 60), 2, '0', STR_PAD_LEFT);

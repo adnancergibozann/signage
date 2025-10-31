@@ -46,6 +46,7 @@ function attempt_login(string $username, string $password): bool
             'full_name' => $user['full_name'],
             'department' => $user['department'],
         ];
+        record_syslog('auth.login', sprintf('%s hesabı ile giriş yapıldı.', $user['username']), (int) $user['id']);
         return true;
     }
 
@@ -54,6 +55,10 @@ function attempt_login(string $username, string $password): bool
 
 function logout(): void
 {
+    $current = current_user();
+    if ($current) {
+        record_syslog('auth.logout', sprintf('%s oturumu kapattı.', $current['username'] ?? ''), (int) $current['id']);
+    }
     $_SESSION = [];
     if (ini_get('session.use_cookies')) {
         $params = session_get_cookie_params();

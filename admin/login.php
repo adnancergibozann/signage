@@ -9,6 +9,9 @@ if (current_user()) {
 }
 
 $error = null;
+$logoPath = get_setting('logo_path');
+$logoUrl = $logoPath ? asset_url('public/uploads/branding/' . $logoPath) : null;
+$companyName = get_setting('company_name', 'Gapgross');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username'] ?? '');
@@ -27,7 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 function default_dashboard_route(string $role): string
 {
     return match ($role) {
-        'manager' => url_for('admin/manager.php'),
+        'manager', 'finance', 'accounting' => url_for('admin/manager.php'),
         'boss' => url_for('admin/dashboard.php'),
         'super_admin' => url_for('admin/dashboard.php'),
         default => url_for('index.php'),
@@ -50,6 +53,16 @@ function default_dashboard_route(string $role): string
             width: min(420px, 90%);
             box-shadow: 0 24px 48px rgba(0, 0, 0, 0.35);
         }
+        .login-logo {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 24px;
+        }
+        .login-logo img {
+            max-width: 220px;
+            max-height: 120px;
+            object-fit: contain;
+        }
         .login-card h1 {
             margin-top: 0;
         }
@@ -59,7 +72,12 @@ function default_dashboard_route(string $role): string
 </head>
 <body>
     <div class="login-card">
-        <h1>Gapgross Yönetim</h1>
+        <?php if ($logoUrl): ?>
+            <div class="login-logo">
+                <img src="<?= htmlspecialchars($logoUrl, ENT_QUOTES) ?>" alt="<?= htmlspecialchars($companyName) ?> logosu">
+            </div>
+        <?php endif; ?>
+        <h1><?= htmlspecialchars($companyName) ?> Yönetim</h1>
         <?php if ($error): ?>
             <div class="alert error"><?= htmlspecialchars($error) ?></div>
         <?php endif; ?>

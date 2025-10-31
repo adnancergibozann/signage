@@ -16,12 +16,19 @@ $currentSettings = load_all_settings();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
+        $updatedKeys = [];
         set_setting('company_name', trim($_POST['company_name'] ?? 'Gapgross'));
+        $updatedKeys[] = 'company_name';
         set_setting('theme_primary', $_POST['theme_primary'] ?? '#E3000B');
+        $updatedKeys[] = 'theme_primary';
         set_setting('theme_secondary', $_POST['theme_secondary'] ?? '#17007A');
+        $updatedKeys[] = 'theme_secondary';
         set_setting('signage_refresh_seconds', (string) (int) ($_POST['refresh_seconds'] ?? 5));
+        $updatedKeys[] = 'signage_refresh_seconds';
         set_setting('time_format', $_POST['time_format'] ?? '24h');
+        $updatedKeys[] = 'time_format';
         set_setting('ticker_speed', (string) (int) ($_POST['ticker_speed'] ?? 40));
+        $updatedKeys[] = 'ticker_speed';
 
         $lunchStartInput = $_POST['lunch_notice_start'] ?? '';
         $lunchEndInput = $_POST['lunch_notice_end'] ?? '';
@@ -35,6 +42,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         set_setting('lunch_notice_start', $lunchStart ?? '');
         set_setting('lunch_notice_end', $lunchEnd ?? '');
+        $updatedKeys[] = 'lunch_notice_start';
+        $updatedKeys[] = 'lunch_notice_end';
 
         if (!empty($_FILES['logo']['name'])) {
             $file = upload_file(
@@ -50,6 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 @unlink(public_path('uploads/branding/' . $currentSettings['logo_path']));
             }
             set_setting('logo_path', $file);
+            $updatedKeys[] = 'logo_path';
         }
 
         if (!empty($_FILES['organigram']['name'])) {
@@ -66,9 +76,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 @unlink(public_path('uploads/branding/' . $currentSettings['organigram_path']));
             }
             set_setting('organigram_path', $file);
+            $updatedKeys[] = 'organigram_path';
         }
 
         $message = 'Ayarlar güncellendi.';
+        record_syslog('settings.update', 'Sistem ayarları güncellendi.', null, [
+            'updatedKeys' => array_values(array_unique($updatedKeys)),
+        ]);
         $currentSettings = load_all_settings();
     } catch (Throwable $e) {
         $error = $e->getMessage();

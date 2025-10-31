@@ -72,6 +72,16 @@ function asset_url(string $relativePath): string
     return url_for($path);
 }
 
+function manager_role_keys(): array
+{
+    return ['manager', 'finance', 'accounting'];
+}
+
+function is_manager_role(?string $role): bool
+{
+    return $role !== null && in_array($role, manager_role_keys(), true);
+}
+
 function public_path(string $relativePath): string
 {
     return __DIR__ . '/../public/' . ltrim($relativePath, '/');

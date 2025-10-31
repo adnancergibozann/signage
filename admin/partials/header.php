@@ -3,6 +3,7 @@
 /** @var string $activePage */
 $user = current_user();
 $role = $user['role'] ?? null;
+$managerRoles = manager_role_keys();
 $navItems = [
     ['key' => 'dashboard', 'label' => 'Gösterge Paneli', 'href' => '/admin/dashboard.php', 'roles' => ['super_admin', 'boss', 'manager']],
     ['key' => 'users', 'label' => 'Kullanıcılar', 'href' => '/admin/users.php', 'roles' => ['super_admin']],
@@ -11,8 +12,9 @@ $navItems = [
     ['key' => 'ticker', 'label' => 'Kayan Yazı', 'href' => '/admin/ticker.php', 'roles' => ['super_admin']],
     ['key' => 'media', 'label' => 'Medya Yayınları', 'href' => '/admin/media.php', 'roles' => ['super_admin']],
     ['key' => 'settings', 'label' => 'Ayarlar', 'href' => '/admin/settings.php', 'roles' => ['super_admin']],
-    ['key' => 'manager', 'label' => 'Durumum', 'href' => '/admin/manager.php', 'roles' => ['manager']],
+    ['key' => 'manager', 'label' => 'Durumum', 'href' => '/admin/manager.php', 'roles' => $managerRoles],
     ['key' => 'reports', 'label' => 'Toplantı Raporu', 'href' => '/admin/reports.php', 'roles' => ['boss', 'super_admin']],
+    ['key' => 'syslog', 'label' => 'Sistem Günlükleri', 'href' => '/admin/syslog.php', 'roles' => ['super_admin']],
 ];
 ?>
 <!DOCTYPE html>

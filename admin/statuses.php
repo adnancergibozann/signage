@@ -18,7 +18,7 @@ $error = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $managerId = (int) ($_POST['manager_id'] ?? 0);
     $status = $_POST['status'] ?? 'available';
-    $duration = isset($_POST['duration']) ? (int) $_POST['duration'] : null;
+    $duration = isset($_POST['duration']) ? max(0, (int) $_POST['duration']) : null;
     $note = trim($_POST['note'] ?? '');
     $endsAtInput = $_POST['ends_at'] ?? '';
     $endsAt = null;
@@ -28,11 +28,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $endsAt = new DateTimeImmutable($parsed);
         }
     }
-    if (!$endsAt && $duration && in_array($status, ['lunch', 'leave'], true)) {
-        $endsAt = (new DateTimeImmutable())->modify("+{$duration} minutes");
-    }
     try {
+        $userStmt = $pdo->prepare('SELECT full_name, role FROM users WHERE id = :id');
+        $userStmt->execute(['id' => $managerId]);
+        $managerRow = $userStmt->fetch();
+        if (!$managerRow || !is_manager_role($managerRow['role'])) {
+            throw new RuntimeException('Geçersiz yönetici seçimi.');
+        }
+        $availableStatuses = status_options_for_role($managerRow['role']);
+        if (!in_array($status, $availableStatuses, true)) {
+            throw new RuntimeException('Bu rol için desteklenmeyen durum seçildi.');
+        }
+        if ($duration !== null && $duration <= 0) {
+            $duration = null;
+        }
         update_manager_status($pdo, $managerId, $status, $endsAt, $note ?: null, $duration);
+        record_syslog('status.override', sprintf('%s için durum %s olarak güncellendi.', $managerRow['full_name'], map_status_label($status)), null, [
+            'targetUserId' => $managerId,
+            'status' => $status,
+            'durationMinutes' => $duration,
+        ]);
         $message = 'Durum güncellendi.';
     } catch (Throwable $e) {
         $error = $e->getMessage();
@@ -55,9 +70,10 @@ include __DIR__ . '/partials/header.php';
             <div class="form-grid">
                 <div>
                     <label>Durum</label>
+                    <?php $options = status_options_for_role($manager['role']); ?>
                     <select name="status">
-                        <?php foreach (['available','unavailable','meeting','lunch','leave'] as $statusOption): ?>
-                            <option value="<?= $statusOption ?>"<?= $manager['status'] === $statusOption ? ' selected' : '' ?>><?= htmlspecialchars(map_status_label($statusOption)) ?></option>
+                        <?php foreach ($options as $statusOption): ?>
+                            <option value="<?= htmlspecialchars($statusOption) ?>"<?= $manager['status'] === $statusOption ? ' selected' : '' ?>><?= htmlspecialchars(map_status_label($statusOption)) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -66,8 +82,9 @@ include __DIR__ . '/partials/header.php';
                     <input type="text" name="note" value="<?= htmlspecialchars($manager['note'] ?? '') ?>">
                 </div>
                 <div>
-                    <label>Toplantı/İzin Süresi (dk)</label>
-                    <input type="number" name="duration" min="5" step="5" placeholder="ör. 30">
+                    <label>Süre (dk)</label>
+                    <?php $managerDuration = $manager['remainingSeconds'] !== null ? (int) ceil($manager['remainingSeconds'] / 60) : null; ?>
+                    <input type="number" name="duration" min="0" step="5" placeholder="ör. 30" value="<?= $managerDuration ? htmlspecialchars((string) $managerDuration) : '' ?>">
                 </div>
                 <div>
                     <label>Bitiş Tarihi-Saati</label>

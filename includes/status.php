@@ -1,6 +1,31 @@
 <?php
 declare(strict_types=1);
 
+function status_options_for_role(string $role): array
+{
+    $options = ['available', 'unavailable', 'meeting', 'lunch', 'leave'];
+    if ($role === 'finance') {
+        $options[] = 'cheque_ready';
+        $options[] = 'payment_ready';
+    }
+
+    return array_values(array_unique($options));
+}
+
+function map_status_label(string $status): string
+{
+    return match ($status) {
+        'available' => 'Müsait',
+        'unavailable' => 'Meşgul',
+        'meeting' => 'Toplantıda',
+        'lunch' => 'Yemek Molasında',
+        'leave' => 'İzinli',
+        'cheque_ready' => 'Çek Vermeye Uygun',
+        'payment_ready' => 'Ödemeye Uygun',
+        default => ucfirst($status),
+    };
+}
+
 function update_manager_status(
     PDO $pdo,
     int $managerId,
@@ -22,6 +47,11 @@ function update_manager_status(
 
         $now = new DateTimeImmutable();
 
+        $calculatedEndsAt = $stateEndsAt;
+        if (!$calculatedEndsAt && $durationMinutes && $durationMinutes > 0) {
+            $calculatedEndsAt = $now->modify("+{$durationMinutes} minutes");
+        }
+
         if ($current && $current['status'] === 'meeting' && $status !== 'meeting' && $current['active_meeting_id']) {
             $pdo->prepare('UPDATE meeting_logs SET ended_at = :ended_at WHERE id = :id')->execute([
                 'ended_at' => $now->format('Y-m-d H:i:s'),
@@ -32,7 +62,7 @@ function update_manager_status(
 
         $activeMeetingId = $current['active_meeting_id'] ?? null;
         $stateStartedAt = $now->format('Y-m-d H:i:s');
-        $stateEndsAtStr = $stateEndsAt?->format('Y-m-d H:i:s');
+        $stateEndsAtStr = $calculatedEndsAt?->format('Y-m-d H:i:s');
 
         if ($status === 'meeting') {
             if ($current && $current['active_meeting_id']) {
@@ -40,10 +70,6 @@ function update_manager_status(
                     'ended_at' => $stateStartedAt,
                     'id' => $current['active_meeting_id'],
                 ]);
-            }
-            if (!$stateEndsAt && $durationMinutes) {
-                $stateEndsAt = $now->modify("+{$durationMinutes} minutes");
-                $stateEndsAtStr = $stateEndsAt->format('Y-m-d H:i:s');
             }
             $stmt = $pdo->prepare('INSERT INTO meeting_logs (manager_id, started_at, expected_end_at, note)
                 VALUES (:manager_id, :started_at, :expected_end_at, :note)');
