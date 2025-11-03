@@ -192,10 +192,13 @@ function fetch_next_meetings_for_managers(PDO $pdo, array $managerIds, DateTimeI
         return [];
     }
 
-    $placeholders = implode(',', array_fill(0, count($managerIds), '?'));
+    $placeholders = [];
+    foreach (array_keys($managerIds) as $index) {
+        $placeholders[] = ':manager' . $index;
+    }
     $sql = 'SELECT m.*
         FROM scheduled_meetings m
-        WHERE m.manager_id IN (' . $placeholders . ')
+        WHERE m.manager_id IN (' . implode(',', $placeholders) . ')
             AND (m.status = "in_progress" OR m.status = "planned")
             AND (
                 m.status = "in_progress"
@@ -205,10 +208,8 @@ function fetch_next_meetings_for_managers(PDO $pdo, array $managerIds, DateTimeI
         ORDER BY m.manager_id, m.scheduled_start ASC';
 
     $stmt = $pdo->prepare($sql);
-    $i = 1;
-    foreach ($managerIds as $id) {
-        $stmt->bindValue($i, $id, PDO::PARAM_INT);
-        $i++;
+    foreach ($managerIds as $index => $id) {
+        $stmt->bindValue(':manager' . $index, $id, PDO::PARAM_INT);
     }
     $stmt->bindValue(':reference', $reference->format('Y-m-d H:i:s'));
     $stmt->execute();
