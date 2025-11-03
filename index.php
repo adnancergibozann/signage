@@ -21,7 +21,6 @@ $baseUri = base_uri();
 $placeholderProfile = asset_url('assets/placeholder-profile.svg');
 $signageCss = asset_url('assets/css/signage.css?v=1');
 $signageJs = asset_url('assets/js/signage.js?v=1');
-$globalMeeting = $state['nextMeeting'] ?? null;
 
 $formatMeetingTime = static function (array $meeting) use ($timestamp): string {
     $startRaw = $meeting['scheduledStartIso'] ?? $meeting['scheduledStart'] ?? null;
@@ -49,6 +48,35 @@ $formatMeetingTime = static function (array $meeting) use ($timestamp): string {
     }
 
     return $start->format('d.m Y · H:i');
+};
+
+$formatMeetingTicker = static function (array $meeting) use ($formatMeetingTime): string {
+    $parts = [];
+    $who = [];
+    if (!empty($meeting['visitorName'])) {
+        $who[] = (string) $meeting['visitorName'];
+    }
+    if (!empty($meeting['visitorCompany'])) {
+        $who[] = (string) $meeting['visitorCompany'];
+    }
+    if ($who) {
+        $parts[] = implode(' · ', $who);
+    }
+
+    $time = $formatMeetingTime($meeting);
+    if ($time !== '') {
+        $parts[] = $time;
+    }
+
+    if (!empty($meeting['purpose'])) {
+        $parts[] = (string) $meeting['purpose'];
+    }
+
+    if (!empty($meeting['notes'])) {
+        $parts[] = (string) $meeting['notes'];
+    }
+
+    return implode(' · ', $parts);
 };
 ?>
 <!DOCTYPE html>
@@ -81,56 +109,6 @@ $formatMeetingTime = static function (array $meeting) use ($timestamp): string {
 
         <section class="main-area">
             <div>
-                <div class="next-meeting-board" aria-live="polite">
-                    <div class="next-meeting-board__header">Sıradaki Görüşme</div>
-                    <?php if ($globalMeeting): ?>
-                        <?php
-                            $globalStatus = $globalMeeting['status'] ?? '';
-                            $globalClass = $globalStatus ? ' ' . htmlspecialchars(str_replace('_', '-', $globalStatus)) : '';
-                            $globalLabel = htmlspecialchars($globalMeeting['statusLabel'] ?? 'Planlı Görüşme');
-                            $globalManager = $globalMeeting['manager'] ?? null;
-                            $managerParts = [];
-                            if ($globalManager) {
-                                if (!empty($globalManager['name'])) {
-                                    $managerParts[] = htmlspecialchars((string) $globalManager['name']);
-                                }
-                                if (!empty($globalManager['department'])) {
-                                    $managerParts[] = htmlspecialchars((string) $globalManager['department']);
-                                }
-                            }
-                            $visitorParts = [];
-                            if (!empty($globalMeeting['visitorName'])) {
-                                $visitorParts[] = htmlspecialchars((string) $globalMeeting['visitorName']);
-                            }
-                            if (!empty($globalMeeting['visitorCompany'])) {
-                                $visitorParts[] = htmlspecialchars((string) $globalMeeting['visitorCompany']);
-                            }
-                            $timeText = $formatMeetingTime($globalMeeting);
-                            $purposeText = $globalMeeting['purpose'] ?? '';
-                            $notesText = $globalMeeting['notes'] ?? '';
-                        ?>
-                        <div class="next-meeting-card<?= $globalClass ?>">
-                            <div class="next-meeting-card__status"><?= $globalLabel ?></div>
-                            <?php if ($managerParts): ?>
-                                <div class="next-meeting-card__manager"><?= implode(' · ', $managerParts) ?></div>
-                            <?php endif; ?>
-                            <div class="next-meeting-card__visitor">
-                                <?= $visitorParts ? implode(' · ', $visitorParts) : 'Misafir' ?>
-                            </div>
-                            <?php if ($timeText !== ''): ?>
-                                <div class="next-meeting-card__time"><?= htmlspecialchars($timeText) ?></div>
-                            <?php endif; ?>
-                            <?php if ($purposeText): ?>
-                                <div class="next-meeting-card__purpose"><?= htmlspecialchars($purposeText) ?></div>
-                            <?php endif; ?>
-                            <?php if ($notesText): ?>
-                                <div class="next-meeting-card__notes"><?= htmlspecialchars($notesText) ?></div>
-                            <?php endif; ?>
-                        </div>
-                    <?php else: ?>
-                        <div class="next-meeting-board__empty">Planlı görüşme bulunmuyor.</div>
-                    <?php endif; ?>
-                </div>
                 <div class="status-board" aria-live="polite">
                     <?php if (empty($state['managers'])): ?>
                         <div class="manager-card">Tanımlı satınalma müdürü bulunamadı.</div>
@@ -161,41 +139,17 @@ $formatMeetingTime = static function (array $meeting) use ($timestamp): string {
                                         $meetingStatus = $nextMeeting['status'] ?? '';
                                         $meetingClass = $meetingStatus ? ' ' . htmlspecialchars(str_replace('_', '-', $meetingStatus)) : '';
                                         $meetingLabel = htmlspecialchars($nextMeeting['statusLabel'] ?? 'Planlı Görüşme');
-                                        $visitorName = htmlspecialchars($nextMeeting['visitorName'] ?? 'Misafir');
-                                        $visitorCompany = $nextMeeting['visitorCompany'] ? htmlspecialchars($nextMeeting['visitorCompany']) : null;
-                                        $startText = '';
-                                        $rawStart = $nextMeeting['scheduledStart'] ?? null;
-                                        if ($rawStart) {
-                                            try {
-                                                $meetingStart = new DateTimeImmutable($rawStart);
-                                                if ($meetingStatus === 'in_progress') {
-                                                    $startText = 'Şimdi · ' . $meetingStart->format('H:i');
-                                                } elseif ($meetingStart->format('Y-m-d') === $timestamp->format('Y-m-d')) {
-                                                    $startText = 'Bugün · ' . $meetingStart->format('H:i');
-                                                } else {
-                                                    $startText = $meetingStart->format('d.m Y · H:i');
-                                                }
-                                            } catch (Throwable) {
-                                                $startText = $rawStart;
-                                            }
-                                        }
-                                        $purpose = $nextMeeting['purpose'] ?? '';
-                                        $meetingNote = $nextMeeting['notes'] ?? '';
+                                        $tickerText = $formatMeetingTicker($nextMeeting);
+                                        $tickerText = $tickerText !== '' ? $tickerText : 'Planlı görüşme bilgisi bekleniyor.';
                                     ?>
-                                    <div class="next-meeting<?= $meetingClass ?>">
+                                    <div class="next-meeting next-meeting--ticker<?= $meetingClass ?>">
                                         <div class="next-meeting__label"><?= $meetingLabel ?></div>
-                                        <div class="next-meeting__who">
-                                            <?= $visitorName ?><?php if ($visitorCompany): ?> · <?= $visitorCompany ?><?php endif; ?>
+                                        <div class="next-meeting__ticker">
+                                            <div class="next-meeting__track">
+                                                <span class="next-meeting__text"><?= htmlspecialchars($tickerText) ?></span>
+                                                <span class="next-meeting__text"><?= htmlspecialchars($tickerText) ?></span>
+                                            </div>
                                         </div>
-                                        <?php if ($startText !== ''): ?>
-                                            <div class="next-meeting__time"><?= htmlspecialchars($startText) ?></div>
-                                        <?php endif; ?>
-                                        <?php if ($purpose): ?>
-                                            <div class="next-meeting__purpose"><?= htmlspecialchars($purpose) ?></div>
-                                        <?php endif; ?>
-                                        <?php if ($meetingNote): ?>
-                                            <div class="next-meeting__purpose"><?= htmlspecialchars($meetingNote) ?></div>
-                                        <?php endif; ?>
                                     </div>
                                 <?php endif; ?>
                                 <?php if ($remaining !== null): ?>

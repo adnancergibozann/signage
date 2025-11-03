@@ -96,7 +96,6 @@ function renderSignage(data) {
     applyTheme(data.settings);
     renderClock(data.timestamp, data.settings.timeFormat);
     renderManagers(data.managers);
-    renderNextMeeting(data.nextMeeting);
     renderAnnouncements(data.announcements);
     renderTicker(data.ticker, data.settings);
     renderAlerts(data.alerts);
@@ -198,44 +197,25 @@ function renderManagers(managers) {
             const meeting = manager.nextMeeting;
             const meetingBox = document.createElement('div');
             const statusClass = meeting.status ? meeting.status.replace(/_/g, '-') : '';
-            meetingBox.className = `next-meeting${statusClass ? ` ${statusClass}` : ''}`;
+            meetingBox.className = `next-meeting next-meeting--ticker${statusClass ? ` ${statusClass}` : ''}`;
 
             const label = document.createElement('div');
             label.className = 'next-meeting__label';
             label.textContent = meeting.statusLabel || 'Planlı Görüşme';
             meetingBox.appendChild(label);
 
-            const who = document.createElement('div');
-            who.className = 'next-meeting__who';
-            const whoParts = [];
-            if (meeting.visitorName) {
-                whoParts.push(meeting.visitorName);
-            }
-            if (meeting.visitorCompany) {
-                whoParts.push(meeting.visitorCompany);
-            }
-            who.textContent = whoParts.join(' · ') || 'Misafir';
-            meetingBox.appendChild(who);
-
-            const startIso = meeting.scheduledStartIso || meeting.scheduledStart;
-            const timeEl = document.createElement('div');
-            timeEl.className = 'next-meeting__time';
-            const timeText = formatMeetingTime(meeting, referenceDate);
-            timeEl.textContent = timeText;
-            meetingBox.appendChild(timeEl);
-
-            if (meeting.purpose) {
-                const purpose = document.createElement('div');
-                purpose.className = 'next-meeting__purpose';
-                purpose.textContent = meeting.purpose;
-                meetingBox.appendChild(purpose);
-            }
-            if (meeting.notes) {
-                const notes = document.createElement('div');
-                notes.className = 'next-meeting__purpose';
-                notes.textContent = meeting.notes;
-                meetingBox.appendChild(notes);
-            }
+            const ticker = document.createElement('div');
+            ticker.className = 'next-meeting__ticker';
+            const track = document.createElement('div');
+            track.className = 'next-meeting__track';
+            const text = buildMeetingTickerText(meeting, referenceDate) || 'Planlı görüşme bilgisi bekleniyor.';
+            const span = document.createElement('span');
+            span.className = 'next-meeting__text';
+            span.textContent = text;
+            track.appendChild(span);
+            track.appendChild(span.cloneNode(true));
+            ticker.appendChild(track);
+            meetingBox.appendChild(ticker);
 
             card.appendChild(meetingBox);
         }
@@ -254,85 +234,33 @@ function renderManagers(managers) {
     });
 }
 
-function renderNextMeeting(meeting) {
-    const container = document.querySelector('.next-meeting-board');
-    if (!container) {
-        return;
-    }
-    const referenceDate = signageState.dataTimestamp ? new Date(signageState.dataTimestamp) : new Date();
-    container.innerHTML = '';
-
-    const header = document.createElement('div');
-    header.className = 'next-meeting-board__header';
-    header.textContent = 'Sıradaki Görüşme';
-    container.appendChild(header);
-
-    if (!meeting) {
-        const empty = document.createElement('div');
-        empty.className = 'next-meeting-board__empty';
-        empty.textContent = 'Planlı görüşme bulunmuyor.';
-        container.appendChild(empty);
-        return;
-    }
-
-    const card = document.createElement('div');
-    const statusClass = meeting.status ? meeting.status.replace(/_/g, '-') : '';
-    card.className = `next-meeting-card${statusClass ? ` ${statusClass}` : ''}`;
-
-    const status = document.createElement('div');
-    status.className = 'next-meeting-card__status';
-    status.textContent = meeting.statusLabel || 'Planlı Görüşme';
-    card.appendChild(status);
-
-    if (meeting.manager && (meeting.manager.name || meeting.manager.department)) {
-        const managerLine = document.createElement('div');
-        managerLine.className = 'next-meeting-card__manager';
-        const managerParts = [];
-        if (meeting.manager.name) {
-            managerParts.push(meeting.manager.name);
-        }
-        if (meeting.manager.department) {
-            managerParts.push(meeting.manager.department);
-        }
-        managerLine.textContent = managerParts.join(' · ');
-        card.appendChild(managerLine);
-    }
-
-    const visitorLine = document.createElement('div');
-    visitorLine.className = 'next-meeting-card__visitor';
-    const visitorParts = [];
+function buildMeetingTickerText(meeting, referenceDate) {
+    const parts = [];
+    const whoParts = [];
     if (meeting.visitorName) {
-        visitorParts.push(meeting.visitorName);
+        whoParts.push(meeting.visitorName);
     }
     if (meeting.visitorCompany) {
-        visitorParts.push(meeting.visitorCompany);
+        whoParts.push(meeting.visitorCompany);
     }
-    visitorLine.textContent = visitorParts.join(' · ') || 'Misafir';
-    card.appendChild(visitorLine);
+    if (whoParts.length > 0) {
+        parts.push(whoParts.join(' · '));
+    }
 
     const timeText = formatMeetingTime(meeting, referenceDate);
     if (timeText) {
-        const timeLine = document.createElement('div');
-        timeLine.className = 'next-meeting-card__time';
-        timeLine.textContent = timeText;
-        card.appendChild(timeLine);
+        parts.push(timeText);
     }
 
     if (meeting.purpose) {
-        const purposeLine = document.createElement('div');
-        purposeLine.className = 'next-meeting-card__purpose';
-        purposeLine.textContent = meeting.purpose;
-        card.appendChild(purposeLine);
+        parts.push(meeting.purpose);
     }
 
     if (meeting.notes) {
-        const notesLine = document.createElement('div');
-        notesLine.className = 'next-meeting-card__notes';
-        notesLine.textContent = meeting.notes;
-        card.appendChild(notesLine);
+        parts.push(meeting.notes);
     }
 
-    container.appendChild(card);
+    return parts.join(' · ');
 }
 
 function updateCountdown(el, target) {
