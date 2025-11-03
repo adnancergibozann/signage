@@ -90,6 +90,70 @@ body {
     gap: 24px;
 }
 
+.next-meeting-board {
+    background: var(--gap-surface);
+    border-radius: 20px;
+    padding: 20px;
+    margin-bottom: 24px;
+    border: 2px solid rgba(23, 0, 122, 0.45);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.next-meeting-board__header {
+    font-size: 1.4rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.next-meeting-board__empty {
+    font-size: 1rem;
+    color: var(--gap-muted);
+}
+
+.next-meeting-card {
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 18px;
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    border-left: 4px solid var(--gap-secondary);
+}
+
+.next-meeting-card.in-progress {
+    border-left-color: var(--gap-primary);
+}
+
+.next-meeting-card__status {
+    font-size: 0.95rem;
+    text-transform: uppercase;
+    color: var(--gap-muted);
+    letter-spacing: 0.05em;
+}
+
+.next-meeting-card__manager {
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.next-meeting-card__visitor {
+    font-size: 1.05rem;
+}
+
+.next-meeting-card__time {
+    font-size: 0.95rem;
+    color: var(--gap-muted);
+}
+
+.next-meeting-card__purpose,
+.next-meeting-card__notes {
+    font-size: 0.9rem;
+    color: var(--gap-muted);
+}
+
 .status-board {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));

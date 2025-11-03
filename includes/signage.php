@@ -2,6 +2,68 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/status.php';
+require_once __DIR__ . '/meetings.php';
+
+function format_signage_meeting(array $meeting, DateTimeImmutable $now): array
+{
+    $status = $meeting['status'] ?? 'planned';
+    $statusLabel = $meeting['statusLabel'] ?? meeting_status_label($status);
+
+    $scheduledStart = $meeting['scheduledStart'] ?? $meeting['scheduled_start'] ?? null;
+    $scheduledEnd = $meeting['scheduledEnd'] ?? $meeting['scheduled_end'] ?? null;
+
+    $startIso = null;
+    $endIso = null;
+    $startsInSeconds = null;
+    $isToday = null;
+
+    if ($scheduledStart) {
+        try {
+            $start = new DateTimeImmutable((string) $scheduledStart);
+            $startIso = $start->format(DateTimeInterface::ATOM);
+            $startsInSeconds = $start->getTimestamp() - $now->getTimestamp();
+            $isToday = $start->format('Y-m-d') === $now->format('Y-m-d');
+        } catch (Throwable) {
+            $startIso = $scheduledStart;
+        }
+    }
+
+    if ($scheduledEnd) {
+        try {
+            $end = new DateTimeImmutable((string) $scheduledEnd);
+            $endIso = $end->format(DateTimeInterface::ATOM);
+        } catch (Throwable) {
+            $endIso = $scheduledEnd;
+        }
+    }
+
+    $manager = null;
+    if (isset($meeting['managerId']) || isset($meeting['managerName'])) {
+        $manager = [
+            'id' => isset($meeting['managerId']) ? (int) $meeting['managerId'] : null,
+            'name' => $meeting['managerName'] ?? null,
+            'department' => $meeting['managerDepartment'] ?? null,
+            'role' => $meeting['managerRole'] ?? null,
+        ];
+    }
+
+    return [
+        'id' => isset($meeting['id']) ? (int) $meeting['id'] : null,
+        'status' => $status,
+        'statusLabel' => $statusLabel,
+        'visitorName' => $meeting['visitorName'] ?? null,
+        'visitorCompany' => $meeting['visitorCompany'] ?? null,
+        'purpose' => $meeting['purpose'] ?? null,
+        'notes' => $meeting['notes'] ?? null,
+        'scheduledStart' => $scheduledStart,
+        'scheduledStartIso' => $startIso,
+        'scheduledEnd' => $scheduledEnd,
+        'scheduledEndIso' => $endIso,
+        'startsInSeconds' => $startsInSeconds !== null ? (int) $startsInSeconds : null,
+        'isToday' => $isToday,
+        'manager' => $manager,
+    ];
+}
 
 function fetch_signage_state(): array
 {
@@ -19,6 +81,8 @@ function fetch_signage_state(): array
     $tickerSpeed = (int)($settings['ticker_speed'] ?? 40);
 
     $managers = fetch_managers_with_status($pdo, $now, $settings);
+    $upcomingMeeting = fetch_next_global_meeting($pdo, $now);
+    $nextMeeting = $upcomingMeeting ? format_signage_meeting($upcomingMeeting, $now) : null;
     $announcements = fetch_active_announcements($pdo, $now);
     $tickers = fetch_active_tickers($pdo, $now);
     $media = find_active_media($pdo, $now);
@@ -37,6 +101,7 @@ function fetch_signage_state(): array
             'organigramUrl' => $organigramPath ? asset_url('public/uploads/branding/' . $organigramPath) : null,
         ],
         'managers' => $managers,
+        'nextMeeting' => $nextMeeting,
         'announcements' => $announcements,
         'ticker' => $tickers,
         'activeMedia' => $media,
@@ -80,43 +145,7 @@ function fetch_managers_with_status(PDO $pdo, DateTimeImmutable $now, array $set
 
         $managerId = (int) $row['id'];
         $nextMeeting = $nextMeetings[$managerId] ?? null;
-        $nextMeetingData = null;
-        if ($nextMeeting) {
-            try {
-                $start = new DateTimeImmutable($nextMeeting['scheduledStart']);
-            } catch (Throwable) {
-                $start = null;
-            }
-            $startIso = $start ? $start->format(DateTimeInterface::ATOM) : $nextMeeting['scheduledStart'];
-            $endIso = null;
-            if (!empty($nextMeeting['scheduledEnd'])) {
-                try {
-                    $endIso = (new DateTimeImmutable($nextMeeting['scheduledEnd']))->format(DateTimeInterface::ATOM);
-                } catch (Throwable) {
-                    $endIso = $nextMeeting['scheduledEnd'];
-                }
-            }
-            $startsInSeconds = null;
-            if ($start) {
-                $startsInSeconds = $start->getTimestamp() - $now->getTimestamp();
-            }
-
-            $nextMeetingData = [
-                'id' => $nextMeeting['id'],
-                'status' => $nextMeeting['status'],
-                'statusLabel' => $nextMeeting['statusLabel'],
-                'visitorName' => $nextMeeting['visitorName'],
-                'visitorCompany' => $nextMeeting['visitorCompany'],
-                'purpose' => $nextMeeting['purpose'],
-                'notes' => $nextMeeting['notes'],
-                'scheduledStart' => $nextMeeting['scheduledStart'],
-                'scheduledStartIso' => $startIso,
-                'scheduledEnd' => $nextMeeting['scheduledEnd'],
-                'scheduledEndIso' => $endIso,
-                'startsInSeconds' => $startsInSeconds !== null ? (int) $startsInSeconds : null,
-                'isToday' => $start ? $start->format('Y-m-d') === $now->format('Y-m-d') : null,
-            ];
-        }
+        $nextMeetingData = $nextMeeting ? format_signage_meeting($nextMeeting, $now) : null;
 
         $managers[] = [
             'id' => $managerId,

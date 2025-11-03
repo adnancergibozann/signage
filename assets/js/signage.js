@@ -34,6 +34,38 @@ const signageState = {
     mediaTimer: null,
 };
 
+function isSameDay(dateA, dateB) {
+    return dateA.getFullYear() === dateB.getFullYear()
+        && dateA.getMonth() === dateB.getMonth()
+        && dateA.getDate() === dateB.getDate();
+}
+
+function formatMeetingTime(meeting, referenceDate) {
+    const startIso = meeting?.scheduledStartIso || meeting?.scheduledStart;
+    if (!startIso) {
+        return meeting?.scheduledStart || '';
+    }
+    const startDate = new Date(startIso);
+    if (Number.isNaN(startDate.getTime())) {
+        return meeting?.scheduledStart || '';
+    }
+    const timeString = startDate.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+    if (meeting?.status === 'in_progress') {
+        return `Şimdi · ${timeString}`;
+    }
+    const isToday = meeting?.isToday;
+    const sameDay = typeof isToday === 'boolean' ? isToday : isSameDay(startDate, referenceDate);
+    if (sameDay) {
+        return `Bugün · ${timeString}`;
+    }
+    const dateString = startDate.toLocaleDateString('tr-TR', {
+        weekday: 'long',
+        day: '2-digit',
+        month: 'long',
+    });
+    return `${dateString} · ${timeString}`;
+}
+
 async function loadSignageState() {
     try {
         const response = await fetch(withBase('/public/api/signage.php'), { cache: 'no-store' });
@@ -64,6 +96,7 @@ function renderSignage(data) {
     applyTheme(data.settings);
     renderClock(data.timestamp, data.settings.timeFormat);
     renderManagers(data.managers);
+    renderNextMeeting(data.nextMeeting);
     renderAnnouncements(data.announcements);
     renderTicker(data.ticker, data.settings);
     renderAlerts(data.alerts);
@@ -121,11 +154,6 @@ function renderManagers(managers) {
     signageState.countdownTimers.forEach((timer) => clearInterval(timer));
     signageState.countdownTimers = [];
     const referenceDate = signageState.dataTimestamp ? new Date(signageState.dataTimestamp) : new Date();
-    const isSameDay = (dateA, dateB) => (
-        dateA.getFullYear() === dateB.getFullYear()
-        && dateA.getMonth() === dateB.getMonth()
-        && dateA.getDate() === dateB.getDate()
-    );
     if (!managers || managers.length === 0) {
         const empty = document.createElement('div');
         empty.className = 'manager-card';
@@ -192,25 +220,7 @@ function renderManagers(managers) {
             const startIso = meeting.scheduledStartIso || meeting.scheduledStart;
             const timeEl = document.createElement('div');
             timeEl.className = 'next-meeting__time';
-            let timeText = meeting.scheduledStart || '';
-            if (startIso) {
-                const startDate = new Date(startIso);
-                if (!Number.isNaN(startDate.getTime())) {
-                    const timeString = startDate.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
-                    if (meeting.status === 'in_progress') {
-                        timeText = `Şimdi · ${timeString}`;
-                    } else if (meeting.isToday === true || (meeting.isToday === null && isSameDay(startDate, referenceDate))) {
-                        timeText = `Bugün · ${timeString}`;
-                    } else {
-                        const dateString = startDate.toLocaleDateString('tr-TR', {
-                            weekday: 'long',
-                            day: '2-digit',
-                            month: 'long',
-                        });
-                        timeText = `${dateString} · ${timeString}`;
-                    }
-                }
-            }
+            const timeText = formatMeetingTime(meeting, referenceDate);
             timeEl.textContent = timeText;
             meetingBox.appendChild(timeEl);
 
@@ -242,6 +252,87 @@ function renderManagers(managers) {
 
         container.appendChild(card);
     });
+}
+
+function renderNextMeeting(meeting) {
+    const container = document.querySelector('.next-meeting-board');
+    if (!container) {
+        return;
+    }
+    const referenceDate = signageState.dataTimestamp ? new Date(signageState.dataTimestamp) : new Date();
+    container.innerHTML = '';
+
+    const header = document.createElement('div');
+    header.className = 'next-meeting-board__header';
+    header.textContent = 'Sıradaki Görüşme';
+    container.appendChild(header);
+
+    if (!meeting) {
+        const empty = document.createElement('div');
+        empty.className = 'next-meeting-board__empty';
+        empty.textContent = 'Planlı görüşme bulunmuyor.';
+        container.appendChild(empty);
+        return;
+    }
+
+    const card = document.createElement('div');
+    const statusClass = meeting.status ? meeting.status.replace(/_/g, '-') : '';
+    card.className = `next-meeting-card${statusClass ? ` ${statusClass}` : ''}`;
+
+    const status = document.createElement('div');
+    status.className = 'next-meeting-card__status';
+    status.textContent = meeting.statusLabel || 'Planlı Görüşme';
+    card.appendChild(status);
+
+    if (meeting.manager && (meeting.manager.name || meeting.manager.department)) {
+        const managerLine = document.createElement('div');
+        managerLine.className = 'next-meeting-card__manager';
+        const managerParts = [];
+        if (meeting.manager.name) {
+            managerParts.push(meeting.manager.name);
+        }
+        if (meeting.manager.department) {
+            managerParts.push(meeting.manager.department);
+        }
+        managerLine.textContent = managerParts.join(' · ');
+        card.appendChild(managerLine);
+    }
+
+    const visitorLine = document.createElement('div');
+    visitorLine.className = 'next-meeting-card__visitor';
+    const visitorParts = [];
+    if (meeting.visitorName) {
+        visitorParts.push(meeting.visitorName);
+    }
+    if (meeting.visitorCompany) {
+        visitorParts.push(meeting.visitorCompany);
+    }
+    visitorLine.textContent = visitorParts.join(' · ') || 'Misafir';
+    card.appendChild(visitorLine);
+
+    const timeText = formatMeetingTime(meeting, referenceDate);
+    if (timeText) {
+        const timeLine = document.createElement('div');
+        timeLine.className = 'next-meeting-card__time';
+        timeLine.textContent = timeText;
+        card.appendChild(timeLine);
+    }
+
+    if (meeting.purpose) {
+        const purposeLine = document.createElement('div');
+        purposeLine.className = 'next-meeting-card__purpose';
+        purposeLine.textContent = meeting.purpose;
+        card.appendChild(purposeLine);
+    }
+
+    if (meeting.notes) {
+        const notesLine = document.createElement('div');
+        notesLine.className = 'next-meeting-card__notes';
+        notesLine.textContent = meeting.notes;
+        card.appendChild(notesLine);
+    }
+
+    container.appendChild(card);
 }
 
 function updateCountdown(el, target) {

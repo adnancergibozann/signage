@@ -236,3 +236,43 @@ function fetch_next_meetings_for_managers(PDO $pdo, array $managerIds, DateTimeI
 
     return $next;
 }
+
+function fetch_next_global_meeting(PDO $pdo, DateTimeImmutable $reference): ?array
+{
+    $sql = 'SELECT m.*, u.full_name AS manager_name, u.department AS manager_department, u.role AS manager_role'
+        . ' FROM scheduled_meetings m'
+        . ' INNER JOIN users u ON u.id = m.manager_id'
+        . ' WHERE (m.status = "in_progress" OR m.status = "planned")'
+        . ' AND ('
+        . '     m.status = "in_progress"'
+        . '     OR m.scheduled_start >= :reference'
+        . '     OR (m.scheduled_end IS NOT NULL AND m.scheduled_end >= :reference)'
+        . ' )'
+        . ' ORDER BY CASE WHEN m.status = "in_progress" THEN 0 ELSE 1 END, m.scheduled_start ASC'
+        . ' LIMIT 1';
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute(['reference' => $reference->format('Y-m-d H:i:s')]);
+    $row = $stmt->fetch();
+    if (!$row) {
+        return null;
+    }
+
+    $data = [
+        'id' => (int) $row['id'],
+        'status' => $row['status'],
+        'statusLabel' => meeting_status_label($row['status']),
+        'visitorName' => $row['visitor_name'],
+        'visitorCompany' => $row['visitor_company'],
+        'purpose' => $row['purpose'],
+        'notes' => $row['notes'],
+        'scheduledStart' => $row['scheduled_start'],
+        'scheduledEnd' => $row['scheduled_end'],
+        'managerId' => (int) $row['manager_id'],
+        'managerName' => $row['manager_name'],
+        'managerDepartment' => $row['manager_department'],
+        'managerRole' => $row['manager_role'],
+    ];
+
+    return $data;
+}

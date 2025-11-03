@@ -21,6 +21,35 @@ $baseUri = base_uri();
 $placeholderProfile = asset_url('assets/placeholder-profile.svg');
 $signageCss = asset_url('assets/css/signage.css?v=1');
 $signageJs = asset_url('assets/js/signage.js?v=1');
+$globalMeeting = $state['nextMeeting'] ?? null;
+
+$formatMeetingTime = static function (array $meeting) use ($timestamp): string {
+    $startRaw = $meeting['scheduledStartIso'] ?? $meeting['scheduledStart'] ?? null;
+    if (!$startRaw) {
+        return (string) ($meeting['scheduledStart'] ?? '');
+    }
+    try {
+        $start = new DateTimeImmutable((string) $startRaw);
+    } catch (Throwable) {
+        return (string) $startRaw;
+    }
+
+    $timeText = $start->format('H:i');
+    if (($meeting['status'] ?? null) === 'in_progress') {
+        return 'Şimdi · ' . $timeText;
+    }
+
+    $isToday = $meeting['isToday'] ?? null;
+    $sameDay = $isToday !== null
+        ? (bool) $isToday
+        : $start->format('Y-m-d') === $timestamp->format('Y-m-d');
+
+    if ($sameDay) {
+        return 'Bugün · ' . $timeText;
+    }
+
+    return $start->format('d.m Y · H:i');
+};
 ?>
 <!DOCTYPE html>
 <html lang="tr">
@@ -52,6 +81,56 @@ $signageJs = asset_url('assets/js/signage.js?v=1');
 
         <section class="main-area">
             <div>
+                <div class="next-meeting-board" aria-live="polite">
+                    <div class="next-meeting-board__header">Sıradaki Görüşme</div>
+                    <?php if ($globalMeeting): ?>
+                        <?php
+                            $globalStatus = $globalMeeting['status'] ?? '';
+                            $globalClass = $globalStatus ? ' ' . htmlspecialchars(str_replace('_', '-', $globalStatus)) : '';
+                            $globalLabel = htmlspecialchars($globalMeeting['statusLabel'] ?? 'Planlı Görüşme');
+                            $globalManager = $globalMeeting['manager'] ?? null;
+                            $managerParts = [];
+                            if ($globalManager) {
+                                if (!empty($globalManager['name'])) {
+                                    $managerParts[] = htmlspecialchars((string) $globalManager['name']);
+                                }
+                                if (!empty($globalManager['department'])) {
+                                    $managerParts[] = htmlspecialchars((string) $globalManager['department']);
+                                }
+                            }
+                            $visitorParts = [];
+                            if (!empty($globalMeeting['visitorName'])) {
+                                $visitorParts[] = htmlspecialchars((string) $globalMeeting['visitorName']);
+                            }
+                            if (!empty($globalMeeting['visitorCompany'])) {
+                                $visitorParts[] = htmlspecialchars((string) $globalMeeting['visitorCompany']);
+                            }
+                            $timeText = $formatMeetingTime($globalMeeting);
+                            $purposeText = $globalMeeting['purpose'] ?? '';
+                            $notesText = $globalMeeting['notes'] ?? '';
+                        ?>
+                        <div class="next-meeting-card<?= $globalClass ?>">
+                            <div class="next-meeting-card__status"><?= $globalLabel ?></div>
+                            <?php if ($managerParts): ?>
+                                <div class="next-meeting-card__manager"><?= implode(' · ', $managerParts) ?></div>
+                            <?php endif; ?>
+                            <div class="next-meeting-card__visitor">
+                                <?= $visitorParts ? implode(' · ', $visitorParts) : 'Misafir' ?>
+                            </div>
+                            <?php if ($timeText !== ''): ?>
+                                <div class="next-meeting-card__time"><?= htmlspecialchars($timeText) ?></div>
+                            <?php endif; ?>
+                            <?php if ($purposeText): ?>
+                                <div class="next-meeting-card__purpose"><?= htmlspecialchars($purposeText) ?></div>
+                            <?php endif; ?>
+                            <?php if ($notesText): ?>
+                                <div class="next-meeting-card__notes"><?= htmlspecialchars($notesText) ?></div>
+                            <?php endif; ?>
+                        </div>
+                    <?php else: ?>
+                        <div class="next-meeting-board__empty">Planlı görüşme bulunmuyor.</div>
+                    <?php endif; ?>
+                </div>
                 <div class="status-board" aria-live="polite">
                     <?php if (empty($state['managers'])): ?>
                         <div class="manager-card">Tanımlı satınalma müdürü bulunamadı.</div>
