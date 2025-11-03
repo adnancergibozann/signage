@@ -107,9 +107,20 @@ function fetch_scheduled_meetings(PDO $pdo, array $options = []): array
         $conditions[] = 'm.status = :status';
         $params['status'] = $options['status'];
     } elseif (!empty($options['status_in']) && is_array($options['status_in'])) {
-        $placeholders = implode(',', array_fill(0, count($options['status_in']), '?'));
-        $conditions[] = 'm.status IN (' . $placeholders . ')';
-        $params = array_merge($params, array_values($options['status_in']));
+        $values = array_values(array_filter(
+            $options['status_in'],
+            static fn($value) => $value !== null && $value !== ''
+        ));
+
+        if ($values) {
+            $placeholders = [];
+            foreach ($values as $index => $value) {
+                $key = 'status_in_' . $index;
+                $placeholders[] = ':' . $key;
+                $params[$key] = $value;
+            }
+            $conditions[] = 'm.status IN (' . implode(',', $placeholders) . ')';
+        }
     }
 
     if (!empty($options['manager_id'])) {
@@ -155,18 +166,8 @@ function fetch_scheduled_meetings(PDO $pdo, array $options = []): array
 
     $stmt = $pdo->prepare($sql);
 
-    $index = 1;
     foreach ($params as $key => $value) {
-        if (is_int($key)) {
-            $stmt->bindValue($index, $value);
-            $index++;
-        }
-    }
-
-    foreach ($params as $key => $value) {
-        if (!is_int($key)) {
-            $stmt->bindValue(':' . $key, $value);
-        }
+        $stmt->bindValue(':' . $key, $value);
     }
 
     $stmt->execute();
