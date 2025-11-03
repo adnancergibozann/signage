@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 require __DIR__ . '/../includes/bootstrap.php';
 require __DIR__ . '/../includes/signage.php';
-require __DIR__ . '/../includes/status.php';
+require_once __DIR__ . '/../includes/status.php';
 
 require_login();
 require_role(['super_admin', 'secretary']);
