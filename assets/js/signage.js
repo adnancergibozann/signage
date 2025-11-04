@@ -320,8 +320,24 @@ function renderAnnouncements(announcements) {
 
 function renderTicker(items, settings) {
     const track = document.querySelector('.ticker-track');
+    if (!track) {
+        return;
+    }
+    const root = document.documentElement;
+    const fontSize = settings?.tickerFontSize;
+    const bandHeight = settings?.tickerHeight;
+    if (fontSize && Number.isFinite(fontSize)) {
+        root.style.setProperty('--ticker-font-size', `${fontSize}px`);
+    } else {
+        root.style.removeProperty('--ticker-font-size');
+    }
+    if (bandHeight && Number.isFinite(bandHeight)) {
+        root.style.setProperty('--ticker-height', `${bandHeight}px`);
+    } else {
+        root.style.removeProperty('--ticker-height');
+    }
     track.innerHTML = '';
-    const speed = settings.tickerSpeed ? `${settings.tickerSpeed}s` : '35s';
+    const speed = settings?.tickerSpeed ? `${settings.tickerSpeed}s` : '35s';
     track.style.setProperty('animation-duration', speed);
     if (!items || items.length === 0) {
         const placeholder = document.createElement('div');

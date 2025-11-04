@@ -233,6 +233,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ]);
                     break;
 
+                case 'update_ticker_settings':
+                    $fontSize = isset($_POST['ticker_font_size']) ? (int) $_POST['ticker_font_size'] : 24;
+                    $bandHeight = isset($_POST['ticker_band_height']) ? (int) $_POST['ticker_band_height'] : 70;
+                    $fontSize = max(12, min(96, $fontSize));
+                    $bandHeight = max(40, min(240, $bandHeight));
+                    set_setting('ticker_font_size', (string) $fontSize);
+                    set_setting('ticker_band_height', (string) $bandHeight);
+                    $message = 'Kayan yazı ayarları güncellendi.';
+                    record_syslog('secretary.ticker.settings', 'Sekreter kayan yazı görünümünü güncelledi.', $currentUser['id'] ?? null, [
+                        'fontSize' => $fontSize,
+                        'bandHeight' => $bandHeight,
+                    ]);
+                    break;
+
                 case 'create_ticker':
                     $tickerMessage = trim($_POST['message'] ?? '');
                     if ($tickerMessage === '') {
@@ -443,6 +457,318 @@ $calendarMeetings = array_map(static function (array $meeting): array {
     ];
 }, $calendarMeetingsRaw);
 
+function render_secretary_upcoming_block(array $meetings): string
+{
+    ob_start();
+    if (!$meetings) {
+        echo '<p>Planlanmış yaklaşan görüşme bulunmuyor.</p>';
+    } else {
+        ?>
+        <div class="table-scroll">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Başlangıç</th>
+                        <th>Bitiş</th>
+                        <th>Yönetici</th>
+                        <th>Misafir</th>
+                        <th>Konu / Not</th>
+                        <th>Durum</th>
+                        <th>İşlemler</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($meetings as $meeting): ?>
+                        <?php
+                            $startLabel = $meeting['scheduled_start'] ? format_datetime($meeting['scheduled_start'], 'd.m H:i') : '-';
+                            $endLabel = $meeting['scheduled_end'] ? format_datetime($meeting['scheduled_end'], 'H:i') : '-';
+                            $visitorLine = htmlspecialchars($meeting['visitor_name'] ?? '-');
+                            if (!empty($meeting['visitor_company'])) {
+                                $visitorLine .= ' · ' . htmlspecialchars($meeting['visitor_company']);
+                            }
+                            $purposeParts = [];
+                            if (!empty($meeting['purpose'])) {
+                                $purposeParts[] = htmlspecialchars($meeting['purpose']);
+                            }
+                            if (!empty($meeting['notes'])) {
+                                $purposeParts[] = nl2br(htmlspecialchars($meeting['notes']));
+                            }
+                        ?>
+                        <tr>
+                            <td><?= $startLabel ?></td>
+                            <td><?= $endLabel ?></td>
+                            <td>
+                                <strong><?= htmlspecialchars($meeting['manager_name']) ?></strong>
+                                <?php if (!empty($meeting['manager_department'])): ?>
+                                    <div class="table-subtext"><?= htmlspecialchars($meeting['manager_department']) ?></div>
+                                <?php endif; ?>
+                            </td>
+                            <td><?= $visitorLine ?></td>
+                            <td>
+                                <?php if ($purposeParts): ?>
+                                    <?php foreach ($purposeParts as $line): ?>
+                                        <div><?= $line ?></div>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    -
+                                <?php endif; ?>
+                            </td>
+                            <td><span class="badge"><?= htmlspecialchars($meeting['status_label']) ?></span></td>
+                            <td>
+                                <div class="table-actions">
+                                    <form method="post">
+                                        <input type="hidden" name="action" value="update_meeting_status">
+                                        <input type="hidden" name="meeting_id" value="<?= (int) $meeting['id'] ?>">
+                                        <select name="status">
+                                            <?php foreach (meeting_status_options() as $value): ?>
+                                                <option value="<?= htmlspecialchars($value) ?>" <?= $value === $meeting['status'] ? 'selected' : '' ?>>
+                                                    <?= htmlspecialchars(meeting_status_label($value)) ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                        <button class="button secondary" type="submit">Kaydet</button>
+                                    </form>
+                                    <form method="post" onsubmit="return confirm('Bu görüşme silinsin mi?');">
+                                        <input type="hidden" name="action" value="delete_meeting">
+                                        <input type="hidden" name="meeting_id" value="<?= (int) $meeting['id'] ?>">
+                                        <button class="button danger" type="submit">Sil</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <?php
+    }
+
+    return trim((string) ob_get_clean());
+}
+
+function render_secretary_recent_block(array $meetings): string
+{
+    ob_start();
+    if (!$meetings) {
+        echo '<p>Henüz sonuçlanan veya iptal edilen görüşme yok.</p>';
+    } else {
+        ?>
+        <div class="table-scroll">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Başlangıç</th>
+                        <th>Bitiş</th>
+                        <th>Yönetici</th>
+                        <th>Misafir</th>
+                        <th>Durum</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($meetings as $meeting): ?>
+                        <?php
+                            $startLabel = $meeting['scheduled_start'] ? format_datetime($meeting['scheduled_start'], 'd.m H:i') : '-';
+                            $endLabel = $meeting['scheduled_end'] ? format_datetime($meeting['scheduled_end'], 'H:i') : '-';
+                            $visitorLine = htmlspecialchars($meeting['visitor_name'] ?? '-');
+                            if (!empty($meeting['visitor_company'])) {
+                                $visitorLine .= ' · ' . htmlspecialchars($meeting['visitor_company']);
+                            }
+                        ?>
+                        <tr>
+                            <td><?= $startLabel ?></td>
+                            <td><?= $endLabel ?></td>
+                            <td>
+                                <strong><?= htmlspecialchars($meeting['manager_name']) ?></strong>
+                                <?php if (!empty($meeting['manager_department'])): ?>
+                                    <div class="table-subtext"><?= htmlspecialchars($meeting['manager_department']) ?></div>
+                                <?php endif; ?>
+                            </td>
+                            <td><?= $visitorLine ?></td>
+                            <td><span class="badge"><?= htmlspecialchars($meeting['status_label']) ?></span></td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <?php
+    }
+
+    return trim((string) ob_get_clean());
+}
+
+function render_secretary_status_rows(array $managers): string
+{
+    ob_start();
+    if (!$managers) {
+        ?>
+        <tr>
+            <td colspan="6">Tanımlı yönetici bulunmuyor.</td>
+        </tr>
+        <?php
+    } else {
+        foreach ($managers as $manager) {
+            ?>
+            <tr>
+                <td><input type="checkbox" name="selected_managers[]" value="<?= (int) $manager['id'] ?>"></td>
+                <td>
+                    <?= htmlspecialchars($manager['name']) ?><br>
+                    <small><?= htmlspecialchars(role_label($manager['role'])) ?></small>
+                </td>
+                <td><?= htmlspecialchars($manager['department'] ?? '') ?></td>
+                <td><span class="badge"><?= htmlspecialchars($manager['statusLabel']) ?></span></td>
+                <td><?= htmlspecialchars($manager['note'] ?? '') ?></td>
+                <td>
+                    <?php if ($manager['remainingSeconds'] !== null): ?>
+                        <?= format_duration((int) $manager['remainingSeconds']) ?>
+                    <?php elseif (!empty($manager['endsAt'])): ?>
+                        <?= htmlspecialchars(format_datetime($manager['endsAt'], 'd.m H:i')) ?>
+                    <?php else: ?>
+                        -
+                    <?php endif; ?>
+                </td>
+            </tr>
+            <?php
+        }
+    }
+
+    return trim((string) ob_get_clean());
+}
+
+function render_secretary_ticker_block(array $tickers): string
+{
+    ob_start();
+    if (!$tickers) {
+        echo '<p>Henüz kayan yazı eklenmemiş.</p>';
+    } else {
+        ?>
+        <div class="table-scroll">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Mesaj</th>
+                        <th>Öncelik</th>
+                        <th>Durum</th>
+                        <th>Başlangıç</th>
+                        <th>Bitiş</th>
+                        <th>İşlemler</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($tickers as $item): ?>
+                        <tr>
+                            <td><?= htmlspecialchars($item['message']) ?></td>
+                            <td><?= (int) $item['priority'] ?></td>
+                            <td><span class="badge"><?= $item['is_active'] ? 'Aktif' : 'Pasif' ?></span></td>
+                            <td><?= $item['starts_at'] ? htmlspecialchars(format_datetime($item['starts_at'], 'd.m H:i')) : '-' ?></td>
+                            <td><?= $item['ends_at'] ? htmlspecialchars(format_datetime($item['ends_at'], 'd.m H:i')) : '-' ?></td>
+                            <td>
+                                <div class="table-actions">
+                                    <form method="post">
+                                        <input type="hidden" name="action" value="toggle_ticker">
+                                        <input type="hidden" name="id" value="<?= (int) $item['id'] ?>">
+                                        <input type="hidden" name="is_active" value="<?= $item['is_active'] ? '0' : '1' ?>">
+                                        <button class="button secondary" type="submit"><?= $item['is_active'] ? 'Pasifleştir' : 'Aktifleştir' ?></button>
+                                    </form>
+                                    <form method="post" onsubmit="return confirm('Bu kayıt silinsin mi?');">
+                                        <input type="hidden" name="action" value="delete_ticker">
+                                        <input type="hidden" name="id" value="<?= (int) $item['id'] ?>">
+                                        <button class="button danger" type="submit">Sil</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <?php
+    }
+
+    return trim((string) ob_get_clean());
+}
+
+function render_secretary_announcement_block(array $announcements): string
+{
+    ob_start();
+    if (!$announcements) {
+        echo '<p>Henüz duyuru eklenmemiş.</p>';
+    } else {
+        ?>
+        <div class="table-scroll">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Başlık</th>
+                        <th>Öncelik</th>
+                        <th>Durum</th>
+                        <th>Başlangıç</th>
+                        <th>Bitiş</th>
+                        <th>İşlemler</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($announcements as $item): ?>
+                        <tr>
+                            <td>
+                                <strong><?= htmlspecialchars($item['title']) ?></strong>
+                                <?php if (!empty($item['body'])): ?>
+                                    <div class="table-subtext">
+                                        <?= nl2br(htmlspecialchars($item['body'])) ?>
+                                    </div>
+                                <?php endif; ?>
+                            </td>
+                            <td><?= (int) $item['priority'] ?></td>
+                            <td><span class="badge"><?= $item['is_active'] ? 'Aktif' : 'Pasif' ?></span></td>
+                            <td><?= $item['starts_at'] ? htmlspecialchars(format_datetime($item['starts_at'], 'd.m H:i')) : '-' ?></td>
+                            <td><?= $item['ends_at'] ? htmlspecialchars(format_datetime($item['ends_at'], 'd.m H:i')) : '-' ?></td>
+                            <td>
+                                <div class="table-actions">
+                                    <form method="post">
+                                        <input type="hidden" name="action" value="toggle_announcement">
+                                        <input type="hidden" name="id" value="<?= (int) $item['id'] ?>">
+                                        <input type="hidden" name="is_active" value="<?= $item['is_active'] ? '0' : '1' ?>">
+                                        <button class="button secondary" type="submit"><?= $item['is_active'] ? 'Pasifleştir' : 'Aktifleştir' ?></button>
+                                    </form>
+                                    <form method="post" onsubmit="return confirm('Bu duyuru silinsin mi?');">
+                                        <input type="hidden" name="action" value="delete_announcement">
+                                        <input type="hidden" name="id" value="<?= (int) $item['id'] ?>">
+                                        <button class="button danger" type="submit">Sil</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <?php
+    }
+
+    return trim((string) ob_get_clean());
+}
+
+if (($_GET['refresh'] ?? '') === '1') {
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode([
+        'upcomingHtml' => render_secretary_upcoming_block($upcomingMeetings),
+        'recentHtml' => render_secretary_recent_block($recentMeetings),
+        'statusRowsHtml' => render_secretary_status_rows($managers),
+        'tickerHtml' => render_secretary_ticker_block($tickers),
+        'announcementsHtml' => render_secretary_announcement_block($announcements),
+        'calendarMeetings' => $calendarMeetings,
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+$tickerFontSize = (int) ($settings['ticker_font_size'] ?? 24);
+if ($tickerFontSize <= 0) {
+    $tickerFontSize = 24;
+}
+$tickerBandHeight = (int) ($settings['ticker_band_height'] ?? 70);
+if ($tickerBandHeight <= 0) {
+    $tickerBandHeight = 70;
+}
+
 include __DIR__ . '/partials/header.php';
 ?>
 <?php if ($message): ?><div class="alert success"><?= htmlspecialchars($message) ?></div><?php endif; ?>
@@ -548,131 +874,16 @@ include __DIR__ . '/partials/header.php';
 
     <section class="card">
         <h3>Yaklaşan Görüşmeler</h3>
-        <?php if (!$upcomingMeetings): ?>
-            <p>Planlanmış yaklaşan görüşme bulunmuyor.</p>
-        <?php else: ?>
-            <div class="table-scroll">
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Başlangıç</th>
-                            <th>Bitiş</th>
-                            <th>Yönetici</th>
-                            <th>Misafir</th>
-                            <th>Konu / Not</th>
-                            <th>Durum</th>
-                            <th>İşlemler</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($upcomingMeetings as $meeting): ?>
-                            <?php
-                                $startLabel = $meeting['scheduled_start'] ? format_datetime($meeting['scheduled_start'], 'd.m H:i') : '-';
-                                $endLabel = $meeting['scheduled_end'] ? format_datetime($meeting['scheduled_end'], 'H:i') : '-';
-                                $visitorLine = htmlspecialchars($meeting['visitor_name']);
-                                if (!empty($meeting['visitor_company'])) {
-                                    $visitorLine .= ' · ' . htmlspecialchars($meeting['visitor_company']);
-                                }
-                                $purposeParts = [];
-                                if (!empty($meeting['purpose'])) {
-                                    $purposeParts[] = htmlspecialchars($meeting['purpose']);
-                                }
-                                if (!empty($meeting['notes'])) {
-                                    $purposeParts[] = nl2br(htmlspecialchars($meeting['notes']));
-                                }
-                            ?>
-                            <tr>
-                                <td><?= $startLabel ?></td>
-                                <td><?= $endLabel ?></td>
-                                <td>
-                                    <strong><?= htmlspecialchars($meeting['manager_name']) ?></strong>
-                                    <?php if (!empty($meeting['manager_department'])): ?>
-                                        <div class="table-subtext"><?= htmlspecialchars($meeting['manager_department']) ?></div>
-                                    <?php endif; ?>
-                                </td>
-                                <td><?= $visitorLine ?></td>
-                                <td>
-                                    <?php if ($purposeParts): ?>
-                                        <?php foreach ($purposeParts as $line): ?>
-                                            <div><?= $line ?></div>
-                                        <?php endforeach; ?>
-                                    <?php else: ?>
-                                        -
-                                    <?php endif; ?>
-                                </td>
-                                <td><span class="badge"><?= htmlspecialchars($meeting['status_label']) ?></span></td>
-                                <td>
-                                    <div class="table-actions">
-                                        <form method="post">
-                                            <input type="hidden" name="action" value="update_meeting_status">
-                                            <input type="hidden" name="meeting_id" value="<?= (int) $meeting['id'] ?>">
-                                            <select name="status">
-                                                <?php foreach (meeting_status_options() as $value): ?>
-                                                    <option value="<?= htmlspecialchars($value) ?>" <?= $value === $meeting['status'] ? 'selected' : '' ?>>
-                                                        <?= htmlspecialchars(meeting_status_label($value)) ?>
-                                                    </option>
-                                                <?php endforeach; ?>
-                                            </select>
-                                            <button class="button secondary" type="submit">Kaydet</button>
-                                        </form>
-                                        <form method="post" onsubmit="return confirm('Bu görüşme silinsin mi?');">
-                                            <input type="hidden" name="action" value="delete_meeting">
-                                            <input type="hidden" name="meeting_id" value="<?= (int) $meeting['id'] ?>">
-                                            <button class="button danger" type="submit">Sil</button>
-                                        </form>
-                                    </div>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-        <?php endif; ?>
+        <div data-secretary-upcoming>
+            <?= render_secretary_upcoming_block($upcomingMeetings) ?>
+        </div>
     </section>
 
     <section class="card">
         <h3>Son İşlemler</h3>
-        <?php if (!$recentMeetings): ?>
-            <p>Henüz sonuçlanan veya iptal edilen görüşme yok.</p>
-        <?php else: ?>
-            <div class="table-scroll">
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Başlangıç</th>
-                            <th>Bitiş</th>
-                            <th>Yönetici</th>
-                            <th>Misafir</th>
-                            <th>Durum</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($recentMeetings as $meeting): ?>
-                            <?php
-                                $startLabel = $meeting['scheduled_start'] ? format_datetime($meeting['scheduled_start'], 'd.m H:i') : '-';
-                                $endLabel = $meeting['scheduled_end'] ? format_datetime($meeting['scheduled_end'], 'H:i') : '-';
-                                $visitorLine = htmlspecialchars($meeting['visitor_name']);
-                                if (!empty($meeting['visitor_company'])) {
-                                    $visitorLine .= ' · ' . htmlspecialchars($meeting['visitor_company']);
-                                }
-                            ?>
-                            <tr>
-                                <td><?= $startLabel ?></td>
-                                <td><?= $endLabel ?></td>
-                                <td>
-                                    <strong><?= htmlspecialchars($meeting['manager_name']) ?></strong>
-                                    <?php if (!empty($meeting['manager_department'])): ?>
-                                        <div class="table-subtext"><?= htmlspecialchars($meeting['manager_department']) ?></div>
-                                    <?php endif; ?>
-                                </td>
-                                <td><?= $visitorLine ?></td>
-                                <td><span class="badge"><?= htmlspecialchars($meeting['status_label']) ?></span></td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-        <?php endif; ?>
+        <div data-secretary-recent>
+            <?= render_secretary_recent_block($recentMeetings) ?>
+        </div>
     </section>
 </div>
 
@@ -680,71 +891,47 @@ include __DIR__ . '/partials/header.php';
     <section class="card">
         <h3>Toplu Durum Güncelleme</h3>
         <p>Listeden bir veya birden fazla yöneticiyi seçip yeni durum, süre (dakika) ve kısa not belirleyebilirsiniz.</p>
-        <?php if (!$managers): ?>
-            <p>Tanımlı yönetici bulunmuyor.</p>
-        <?php else: ?>
-            <form method="post">
-                <input type="hidden" name="action" value="bulk_status">
-                <div class="table-scroll">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Seç</th>
-                                <th>Ad</th>
-                                <th>Departman</th>
-                                <th>Durum</th>
-                                <th>Not</th>
-                                <th>Kalan Süre</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($managers as $manager): ?>
-                                <tr>
-                                    <td><input type="checkbox" name="selected_managers[]" value="<?= (int) $manager['id'] ?>"></td>
-                                    <td>
-                                        <?= htmlspecialchars($manager['name']) ?><br>
-                                        <small><?= htmlspecialchars(role_label($manager['role'])) ?></small>
-                                    </td>
-                                    <td><?= htmlspecialchars($manager['department'] ?? '') ?></td>
-                                    <td><span class="badge"><?= htmlspecialchars($manager['statusLabel']) ?></span></td>
-                                    <td><?= htmlspecialchars($manager['note'] ?? '') ?></td>
-                                    <td>
-                                        <?php if ($manager['remainingSeconds'] !== null): ?>
-                                            <?= format_duration((int) $manager['remainingSeconds']) ?>
-                                        <?php elseif (!empty($manager['endsAt'])): ?>
-                                            <?= htmlspecialchars(format_datetime($manager['endsAt'], 'd.m H:i')) ?>
-                                        <?php else: ?>
-                                            -
-                                        <?php endif; ?>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
+        <form method="post">
+            <input type="hidden" name="action" value="bulk_status">
+            <div class="table-scroll">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Seç</th>
+                            <th>Ad</th>
+                            <th>Departman</th>
+                            <th>Durum</th>
+                            <th>Not</th>
+                            <th>Kalan Süre</th>
+                        </tr>
+                    </thead>
+                    <tbody data-secretary-status-body>
+                        <?= render_secretary_status_rows($managers) ?>
+                    </tbody>
+                </table>
+            </div>
+            <div class="form-grid" style="margin-top: 18px;">
+                <div>
+                    <label for="bulk_status">Yeni Durum</label>
+                    <select id="bulk_status" name="status" required>
+                        <?php foreach ($statusChoices as $value => $label): ?>
+                            <option value="<?= htmlspecialchars($value) ?>"><?= htmlspecialchars($label) ?></option>
+                        <?php endforeach; ?>
+                    </select>
                 </div>
-                <div class="form-grid" style="margin-top: 18px;">
-                    <div>
-                        <label for="bulk_status">Yeni Durum</label>
-                        <select id="bulk_status" name="status" required>
-                            <?php foreach ($statusChoices as $value => $label): ?>
-                                <option value="<?= htmlspecialchars($value) ?>"><?= htmlspecialchars($label) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div>
-                        <label for="bulk_duration">Süre (dk)</label>
-                        <input type="number" id="bulk_duration" name="duration" min="0" step="5" placeholder="ör. 30">
-                    </div>
-                    <div>
-                        <label for="bulk_note">Not</label>
-                        <input type="text" id="bulk_note" name="note" placeholder="İsteğe bağlı not">
-                    </div>
+                <div>
+                    <label for="bulk_duration">Süre (dk)</label>
+                    <input type="number" id="bulk_duration" name="duration" min="0" step="5" placeholder="ör. 30">
                 </div>
-                <div class="actions">
-                    <button class="button" type="submit">Durumları Güncelle</button>
+                <div>
+                    <label for="bulk_note">Not</label>
+                    <input type="text" id="bulk_note" name="note" placeholder="İsteğe bağlı not">
                 </div>
-            </form>
-        <?php endif; ?>
+            </div>
+            <div class="actions">
+                <button class="button" type="submit">Durumları Güncelle</button>
+            </div>
+        </form>
     </section>
 </div>
 
@@ -771,6 +958,27 @@ include __DIR__ . '/partials/header.php';
 </div>
 
 <div class="panel-section" data-section="ticker">
+    <section class="card">
+        <h3>Kayan Yazı Ayarları</h3>
+        <form method="post">
+            <input type="hidden" name="action" value="update_ticker_settings">
+            <div class="form-grid">
+                <div>
+                    <label for="ticker_font_size">Punto (px)</label>
+                    <input type="number" id="ticker_font_size" name="ticker_font_size" min="12" max="96" value="<?= htmlspecialchars((string) $tickerFontSize) ?>" required>
+                </div>
+                <div>
+                    <label for="ticker_band_height">Bant Yüksekliği (px)</label>
+                    <input type="number" id="ticker_band_height" name="ticker_band_height" min="40" max="240" value="<?= htmlspecialchars((string) $tickerBandHeight) ?>" required>
+                </div>
+            </div>
+            <p class="form-help">Değerler signage ekranındaki kayan yazı alanına anında yansır.</p>
+            <div class="actions">
+                <button class="button" type="submit">Ayarları Kaydet</button>
+            </div>
+        </form>
+    </section>
+
     <section class="card">
         <h3>Kayan Yazı Girişi</h3>
         <form method="post">
@@ -808,50 +1016,9 @@ include __DIR__ . '/partials/header.php';
 
     <section class="card">
         <h3>Mevcut Kayan Yazılar</h3>
-        <?php if (!$tickers): ?>
-            <p>Henüz kayan yazı eklenmemiş.</p>
-        <?php else: ?>
-            <div class="table-scroll">
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Mesaj</th>
-                            <th>Öncelik</th>
-                            <th>Durum</th>
-                            <th>Başlangıç</th>
-                            <th>Bitiş</th>
-                            <th>İşlemler</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($tickers as $item): ?>
-                            <tr>
-                                <td><?= htmlspecialchars($item['message']) ?></td>
-                                <td><?= (int) $item['priority'] ?></td>
-                                <td><span class="badge"><?= $item['is_active'] ? 'Aktif' : 'Pasif' ?></span></td>
-                                <td><?= $item['starts_at'] ? htmlspecialchars(format_datetime($item['starts_at'], 'd.m H:i')) : '-' ?></td>
-                                <td><?= $item['ends_at'] ? htmlspecialchars(format_datetime($item['ends_at'], 'd.m H:i')) : '-' ?></td>
-                                <td>
-                                    <div class="table-actions">
-                                        <form method="post">
-                                            <input type="hidden" name="action" value="toggle_ticker">
-                                            <input type="hidden" name="id" value="<?= (int) $item['id'] ?>">
-                                            <input type="hidden" name="is_active" value="<?= $item['is_active'] ? '0' : '1' ?>">
-                                            <button class="button secondary" type="submit"><?= $item['is_active'] ? 'Pasifleştir' : 'Aktifleştir' ?></button>
-                                        </form>
-                                        <form method="post" onsubmit="return confirm('Bu kayan yazı silinsin mi?');">
-                                            <input type="hidden" name="action" value="delete_ticker">
-                                            <input type="hidden" name="id" value="<?= (int) $item['id'] ?>">
-                                            <button class="button danger" type="submit">Sil</button>
-                                        </form>
-                                    </div>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-        <?php endif; ?>
+        <div data-secretary-ticker>
+            <?= render_secretary_ticker_block($tickers) ?>
+        </div>
     </section>
 </div>
 
@@ -897,57 +1064,9 @@ include __DIR__ . '/partials/header.php';
 
     <section class="card">
         <h3>Mevcut Duyurular</h3>
-        <?php if (!$announcements): ?>
-            <p>Henüz duyuru eklenmemiş.</p>
-        <?php else: ?>
-            <div class="table-scroll">
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Başlık</th>
-                            <th>Öncelik</th>
-                            <th>Durum</th>
-                            <th>Başlangıç</th>
-                            <th>Bitiş</th>
-                            <th>İşlemler</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($announcements as $item): ?>
-                            <tr>
-                                <td>
-                                    <strong><?= htmlspecialchars($item['title']) ?></strong>
-                                    <?php if (!empty($item['body'])): ?>
-                                        <div class="table-subtext">
-                                            <?= nl2br(htmlspecialchars($item['body'])) ?>
-                                        </div>
-                                    <?php endif; ?>
-                                </td>
-                                <td><?= (int) $item['priority'] ?></td>
-                                <td><span class="badge"><?= $item['is_active'] ? 'Aktif' : 'Pasif' ?></span></td>
-                                <td><?= $item['starts_at'] ? htmlspecialchars(format_datetime($item['starts_at'], 'd.m H:i')) : '-' ?></td>
-                                <td><?= $item['ends_at'] ? htmlspecialchars(format_datetime($item['ends_at'], 'd.m H:i')) : '-' ?></td>
-                                <td>
-                                    <div class="table-actions">
-                                        <form method="post">
-                                            <input type="hidden" name="action" value="toggle_announcement">
-                                            <input type="hidden" name="id" value="<?= (int) $item['id'] ?>">
-                                            <input type="hidden" name="is_active" value="<?= $item['is_active'] ? '0' : '1' ?>">
-                                            <button class="button secondary" type="submit"><?= $item['is_active'] ? 'Pasifleştir' : 'Aktifleştir' ?></button>
-                                        </form>
-                                        <form method="post" onsubmit="return confirm('Bu duyuru silinsin mi?');">
-                                            <input type="hidden" name="action" value="delete_announcement">
-                                            <input type="hidden" name="id" value="<?= (int) $item['id'] ?>">
-                                            <button class="button danger" type="submit">Sil</button>
-                                        </form>
-                                    </div>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-        <?php endif; ?>
+        <div data-secretary-announcements>
+            <?= render_secretary_announcement_block($announcements) ?>
+        </div>
     </section>
 </div>
 
@@ -986,6 +1105,9 @@ window.secretaryCalendarMeetings = <?= json_encode($calendarMeetings, JSON_HEX_T
 
     const calendarRoot = document.querySelector('[data-calendar]');
     if (!calendarRoot) {
+        window.secretaryCalendarController = {
+            setMeetings() {},
+        };
         activateSection('agenda');
         return;
     }
@@ -999,8 +1121,9 @@ window.secretaryCalendarMeetings = <?= json_encode($calendarMeetings, JSON_HEX_T
     const todayBtn = calendarRoot.querySelector('[data-calendar-today]');
 
     const rawMeetings = Array.isArray(window.secretaryCalendarMeetings) ? window.secretaryCalendarMeetings : [];
-    const meetings = rawMeetings.map((item) => {
-        return {
+
+    function normalizeMeetings(source) {
+        return source.map((item) => ({
             id: item.id,
             manager: item.manager,
             managerDepartment: item.managerDepartment,
@@ -1011,9 +1134,11 @@ window.secretaryCalendarMeetings = <?= json_encode($calendarMeetings, JSON_HEX_T
             status: item.status,
             statusLabel: item.statusLabel,
             start: item.start ? new Date(item.start) : null,
-            end: item.end ? new Date(item.end) : null
-        };
-    });
+            end: item.end ? new Date(item.end) : null,
+        }));
+    }
+
+    let meetings = normalizeMeetings(rawMeetings);
 
     let currentMonth = new Date();
     currentMonth.setDate(1);
@@ -1190,9 +1315,95 @@ window.secretaryCalendarMeetings = <?= json_encode($calendarMeetings, JSON_HEX_T
         renderDetails();
     });
 
+    function setMeetings(newData) {
+        const safeData = Array.isArray(newData) ? newData : [];
+        window.secretaryCalendarMeetings = safeData;
+        meetings = normalizeMeetings(safeData);
+        renderCalendar();
+        renderDetails();
+    }
+
+    window.secretaryCalendarController = {
+        setMeetings,
+    };
+
     renderCalendar();
     renderDetails();
     activateSection('agenda');
+})();
+</script>
+
+<script>
+(function () {
+    const refreshUrl = '<?= htmlspecialchars(url_for('admin/secretary.php?refresh=1'), ENT_QUOTES, 'UTF-8') ?>';
+    const upcomingContainer = document.querySelector('[data-secretary-upcoming]');
+    const recentContainer = document.querySelector('[data-secretary-recent]');
+    const tickerContainer = document.querySelector('[data-secretary-ticker]');
+    const announcementContainer = document.querySelector('[data-secretary-announcements]');
+    const statusBody = document.querySelector('[data-secretary-status-body]');
+    const refreshIntervalMs = 15000;
+    let refreshTimer = null;
+
+    function updateContainer(container, html) {
+        if (!container || typeof html !== 'string') {
+            return;
+        }
+        const trimmed = html.trim();
+        if (container.innerHTML.trim() === trimmed) {
+            return;
+        }
+        container.innerHTML = trimmed;
+    }
+
+    function updateStatusRows(html) {
+        if (!statusBody || typeof html !== 'string') {
+            return;
+        }
+        const selected = Array.from(statusBody.querySelectorAll('input[type="checkbox"]:checked'))
+            .map((input) => input.value);
+        statusBody.innerHTML = html.trim();
+        if (selected.length) {
+            selected.forEach((value) => {
+                const checkbox = statusBody.querySelector(`input[type="checkbox"][value="${value}"]`);
+                if (checkbox) {
+                    checkbox.checked = true;
+                }
+            });
+        }
+    }
+
+    async function performRefresh() {
+        try {
+            const response = await fetch(refreshUrl, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+            });
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            const payload = await response.json();
+            updateContainer(upcomingContainer, payload.upcomingHtml ?? '');
+            updateContainer(recentContainer, payload.recentHtml ?? '');
+            updateContainer(tickerContainer, payload.tickerHtml ?? '');
+            updateContainer(announcementContainer, payload.announcementsHtml ?? '');
+            if (payload.statusRowsHtml !== undefined) {
+                updateStatusRows(payload.statusRowsHtml);
+            }
+            if (payload.calendarMeetings && window.secretaryCalendarController) {
+                window.secretaryCalendarController.setMeetings(payload.calendarMeetings);
+            }
+        } catch (error) {
+            console.error('Sekreter paneli yenilenemedi:', error);
+        } finally {
+            refreshTimer = window.setTimeout(performRefresh, refreshIntervalMs);
+        }
+    }
+
+    refreshTimer = window.setTimeout(performRefresh, refreshIntervalMs);
 })();
 </script>
 

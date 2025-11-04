@@ -87,6 +87,14 @@ function fetch_signage_state(): array
     $primary = $settings['theme_primary'] ?? config_value('theme.primary');
     $secondary = $settings['theme_secondary'] ?? config_value('theme.secondary');
     $tickerSpeed = (int)($settings['ticker_speed'] ?? 40);
+    $tickerFontSize = (int)($settings['ticker_font_size'] ?? 24);
+    $tickerBandHeight = (int)($settings['ticker_band_height'] ?? 70);
+    if ($tickerFontSize <= 0) {
+        $tickerFontSize = 24;
+    }
+    if ($tickerBandHeight <= 0) {
+        $tickerBandHeight = 70;
+    }
 
     $managers = fetch_managers_with_status($pdo, $now, $settings);
     $upcomingMeeting = fetch_next_global_meeting($pdo, $now);
@@ -105,6 +113,8 @@ function fetch_signage_state(): array
             'primaryColor' => $primary,
             'secondaryColor' => $secondary,
             'tickerSpeed' => $tickerSpeed,
+            'tickerFontSize' => $tickerFontSize,
+            'tickerHeight' => $tickerBandHeight,
             'logoUrl' => $logoPath ? asset_url('public/uploads/branding/' . $logoPath) : null,
             'organigramUrl' => $organigramPath ? asset_url('public/uploads/branding/' . $organigramPath) : null,
         ],

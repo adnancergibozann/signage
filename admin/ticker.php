@@ -9,13 +9,17 @@ require_role('super_admin');
 $pageTitle = 'Kayan Yazı Yönetimi';
 $activePage = 'ticker';
 $pdo = get_pdo();
+$settings = load_all_settings();
 $message = null;
 $error = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     try {
-        if ($action === 'create') {
+        if ($action === 'update_settings') {
+            handle_update_ticker_settings();
+            $message = 'Ticker ayarları güncellendi.';
+        } elseif ($action === 'create') {
             handle_create_ticker($pdo);
             $message = 'Ticker öğesi oluşturuldu.';
         } elseif ($action === 'update') {
@@ -25,6 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             handle_delete_ticker($pdo);
             $message = 'Ticker silindi.';
         }
+        $settings = load_all_settings();
     } catch (Throwable $e) {
         $error = $e->getMessage();
     }
@@ -32,11 +37,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $stmt = $pdo->query('SELECT * FROM ticker_items ORDER BY priority DESC, created_at DESC');
 $tickers = $stmt->fetchAll();
+$tickerFontSize = (int) ($settings['ticker_font_size'] ?? 24);
+if ($tickerFontSize <= 0) {
+    $tickerFontSize = 24;
+}
+$tickerBandHeight = (int) ($settings['ticker_band_height'] ?? 70);
+if ($tickerBandHeight <= 0) {
+    $tickerBandHeight = 70;
+}
 
 include __DIR__ . '/partials/header.php';
 ?>
 <?php if ($message): ?><div class="alert success"><?= htmlspecialchars($message) ?></div><?php endif; ?>
 <?php if ($error): ?><div class="alert error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
+
+<section class="card">
+    <h3>Kayan Yazı Ayarları</h3>
+    <form method="post">
+        <input type="hidden" name="action" value="update_settings">
+        <div class="form-grid">
+            <div>
+                <label for="ticker_font_size">Punto (px)</label>
+                <input type="number" id="ticker_font_size" name="ticker_font_size" min="12" max="96" value="<?= htmlspecialchars((string) $tickerFontSize) ?>" required>
+            </div>
+            <div>
+                <label for="ticker_band_height">Bant Yüksekliği (px)</label>
+                <input type="number" id="ticker_band_height" name="ticker_band_height" min="40" max="240" value="<?= htmlspecialchars((string) $tickerBandHeight) ?>" required>
+            </div>
+        </div>
+        <p class="form-help">Değerler signage ekranına anında yansır.</p>
+        <div class="actions">
+            <button class="button" type="submit">Ayarları Kaydet</button>
+        </div>
+    </form>
+</section>
 
 <section class="card">
     <h3>Yeni Ticker Öğesi</h3>
@@ -117,6 +151,23 @@ include __DIR__ . '/partials/header.php';
 </section>
 <?php
 include __DIR__ . '/partials/footer.php';
+
+function handle_update_ticker_settings(): void
+{
+    $fontSize = isset($_POST['ticker_font_size']) ? (int) $_POST['ticker_font_size'] : 24;
+    $bandHeight = isset($_POST['ticker_band_height']) ? (int) $_POST['ticker_band_height'] : 70;
+
+    $fontSize = max(12, min(96, $fontSize));
+    $bandHeight = max(40, min(240, $bandHeight));
+
+    set_setting('ticker_font_size', (string) $fontSize);
+    set_setting('ticker_band_height', (string) $bandHeight);
+
+    record_syslog('ticker.settings.update', 'Kayan yazı görünümü güncellendi.', current_user()['id'] ?? null, [
+        'fontSize' => $fontSize,
+        'bandHeight' => $bandHeight,
+    ]);
+}
 
 function handle_create_ticker(PDO $pdo): void
 {

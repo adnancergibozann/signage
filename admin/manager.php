@@ -203,91 +203,207 @@ $calendarMeetings = array_map(static function (array $meeting): array {
     ];
 }, $calendarMeetingsRaw);
 
+function render_manager_status_section(?array $managerData): string
+{
+    if (!$managerData) {
+        return '';
+    }
+
+    ob_start();
+    ?>
+    <section class="card">
+        <h3>Mevcut Durum</h3>
+        <p><strong>Durum:</strong> <?= htmlspecialchars($managerData['statusLabel']) ?></p>
+        <p><strong>Not:</strong> <?= htmlspecialchars($managerData['note'] ?? '-') ?></p>
+        <?php if ($managerData['remainingSeconds'] !== null): ?>
+            <p><strong>Geri Sayım:</strong> <?= format_duration((int) $managerData['remainingSeconds']) ?> sonra</p>
+        <?php elseif (!empty($managerData['endsAt'])): ?>
+            <p><strong>Durum Bitişi:</strong> <?= htmlspecialchars(format_datetime($managerData['endsAt'], 'd.m.Y H:i')) ?></p>
+        <?php endif; ?>
+    </section>
+    <?php
+    return trim((string) ob_get_clean());
+}
+
+function render_manager_highlight_section(?array $activeMeeting, ?array $nextHighlightedMeeting): string
+{
+    if (!$activeMeeting && !$nextHighlightedMeeting) {
+        return '';
+    }
+
+    ob_start();
+    ?>
+    <section class="card meeting-highlight">
+        <h3>Planlı Görüşme Özeti</h3>
+        <div class="meeting-highlight__grid">
+            <?php if ($activeMeeting): ?>
+                <?php
+                    $activeStart = $activeMeeting['scheduled_start'] ? format_datetime($activeMeeting['scheduled_start'], 'd.m H:i') : '-';
+                    $activeVisitor = htmlspecialchars($activeMeeting['visitor_name'] ?? '-');
+                    if (!empty($activeMeeting['visitor_company'])) {
+                        $activeVisitor .= ' · ' . htmlspecialchars($activeMeeting['visitor_company']);
+                    }
+                ?>
+                <div class="meeting-highlight__item is-current">
+                    <div class="meeting-highlight__header">
+                        <h4>Aktif Görüşme</h4>
+                        <span class="badge">Devam Ediyor</span>
+                    </div>
+                    <p class="meeting-highlight__time">Başlangıç: <?= $activeStart ?></p>
+                    <p class="meeting-highlight__visitor"><?= $activeVisitor ?></p>
+                    <?php if (!empty($activeMeeting['purpose'])): ?>
+                        <p class="meeting-highlight__purpose">Konu: <?= htmlspecialchars($activeMeeting['purpose']) ?></p>
+                    <?php endif; ?>
+                    <?php if (!empty($activeMeeting['notes'])): ?>
+                        <p class="meeting-highlight__notes">Not: <?= nl2br(htmlspecialchars($activeMeeting['notes'])) ?></p>
+                    <?php endif; ?>
+                    <form method="post" class="meeting-highlight__actions">
+                        <input type="hidden" name="action" value="finish_meeting">
+                        <input type="hidden" name="meeting_id" value="<?= (int) $activeMeeting['id'] ?>">
+                        <button class="button small" type="submit">Görüşmeyi Bitir</button>
+                    </form>
+                </div>
+            <?php endif; ?>
+
+            <?php if ($nextHighlightedMeeting): ?>
+                <?php
+                    $nextStart = $nextHighlightedMeeting['scheduled_start'] ? format_datetime($nextHighlightedMeeting['scheduled_start'], 'd.m H:i') : '-';
+                    $nextVisitor = htmlspecialchars($nextHighlightedMeeting['visitor_name'] ?? '-');
+                    if (!empty($nextHighlightedMeeting['visitor_company'])) {
+                        $nextVisitor .= ' · ' . htmlspecialchars($nextHighlightedMeeting['visitor_company']);
+                    }
+                    $isTodayLabel = !empty($nextHighlightedMeeting['is_today']) ? ' (Bugün)' : '';
+                ?>
+                <div class="meeting-highlight__item is-next">
+                    <div class="meeting-highlight__header">
+                        <h4>Sıradaki Görüşme<?= $isTodayLabel ?></h4>
+                        <span class="badge">Planlandı</span>
+                    </div>
+                    <p class="meeting-highlight__time">Başlangıç: <?= $nextStart ?></p>
+                    <p class="meeting-highlight__visitor"><?= $nextVisitor ?></p>
+                    <?php if (!empty($nextHighlightedMeeting['purpose'])): ?>
+                        <p class="meeting-highlight__purpose">Konu: <?= htmlspecialchars($nextHighlightedMeeting['purpose']) ?></p>
+                    <?php endif; ?>
+                    <?php if (!empty($nextHighlightedMeeting['notes'])): ?>
+                        <p class="meeting-highlight__notes">Not: <?= nl2br(htmlspecialchars($nextHighlightedMeeting['notes'])) ?></p>
+                    <?php endif; ?>
+                    <?php if ($nextHighlightedMeeting['status'] === 'planned'): ?>
+                        <form method="post" class="meeting-highlight__actions">
+                            <input type="hidden" name="action" value="start_meeting">
+                            <input type="hidden" name="meeting_id" value="<?= (int) $nextHighlightedMeeting['id'] ?>">
+                            <button class="button small secondary" type="submit">Görüşmeyi Başlat</button>
+                        </form>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
+        </div>
+    </section>
+    <?php
+    return trim((string) ob_get_clean());
+}
+
+function render_manager_meetings_section(array $upcomingMeetings): string
+{
+    ob_start();
+    ?>
+    <section class="card">
+        <h3>Planlı Görüşmelerim</h3>
+        <?php if (!$upcomingMeetings): ?>
+            <p>Yaklaşan planlı görüşmeniz bulunmuyor.</p>
+        <?php else: ?>
+            <div class="table-scroll">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Başlangıç</th>
+                            <th>Durum</th>
+                            <th>Misafir</th>
+                            <th>Konu / Not</th>
+                            <th>İşlem</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($upcomingMeetings as $meeting): ?>
+                            <?php
+                                $startLabel = $meeting['scheduled_start'] ? format_datetime($meeting['scheduled_start'], 'd.m H:i') : '-';
+                                $visitor = htmlspecialchars($meeting['visitor_name'] ?? '-');
+                                if (!empty($meeting['visitor_company'])) {
+                                    $visitor .= ' · ' . htmlspecialchars($meeting['visitor_company']);
+                                }
+                                $details = [];
+                                if (!empty($meeting['purpose'])) {
+                                    $details[] = htmlspecialchars($meeting['purpose']);
+                                }
+                                if (!empty($meeting['notes'])) {
+                                    $details[] = nl2br(htmlspecialchars($meeting['notes']));
+                                }
+                            ?>
+                            <tr>
+                                <td><?= $startLabel ?></td>
+                                <td><span class="badge"><?= htmlspecialchars($meeting['status_label']) ?></span></td>
+                                <td><?= $visitor ?></td>
+                                <td>
+                                    <?php if ($details): ?>
+                                        <?php foreach ($details as $line): ?>
+                                            <div><?= $line ?></div>
+                                        <?php endforeach; ?>
+                                    <?php else: ?>
+                                        -
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <div class="table-actions">
+                                        <?php if ($meeting['status'] === 'planned'): ?>
+                                            <form method="post">
+                                                <input type="hidden" name="action" value="start_meeting">
+                                                <input type="hidden" name="meeting_id" value="<?= (int) $meeting['id'] ?>">
+                                                <button class="button small secondary" type="submit">Başlat</button>
+                                            </form>
+                                        <?php elseif ($meeting['status'] === 'in_progress'): ?>
+                                            <form method="post">
+                                                <input type="hidden" name="action" value="finish_meeting">
+                                                <input type="hidden" name="meeting_id" value="<?= (int) $meeting['id'] ?>">
+                                                <button class="button small" type="submit">Bitir</button>
+                                            </form>
+                                        <?php else: ?>
+                                            <span class="table-subtext">-</span>
+                                        <?php endif; ?>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        <?php endif; ?>
+    </section>
+    <?php
+    return trim((string) ob_get_clean());
+}
+
+if (($_GET['refresh'] ?? '') === '1') {
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode([
+        'statusHtml' => render_manager_status_section($managerData),
+        'highlightHtml' => render_manager_highlight_section($activeMeeting, $nextHighlightedMeeting),
+        'meetingsHtml' => render_manager_meetings_section($upcomingMeetings),
+        'calendarMeetings' => $calendarMeetings,
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 include __DIR__ . '/partials/header.php';
 ?>
 <?php if ($message): ?><div class="alert success"><?= htmlspecialchars($message) ?></div><?php endif; ?>
 <?php if ($error): ?><div class="alert error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
 
-<?php if ($managerData): ?>
-<section class="card">
-    <h3>Mevcut Durum</h3>
-    <p><strong>Durum:</strong> <?= htmlspecialchars($managerData['statusLabel']) ?></p>
-    <p><strong>Not:</strong> <?= htmlspecialchars($managerData['note'] ?? '-') ?></p>
-    <?php if ($managerData['remainingSeconds'] !== null): ?>
-        <p><strong>Geri Sayım:</strong> <?= format_duration((int) $managerData['remainingSeconds']) ?> sonra</p>
-    <?php elseif ($managerData['endsAt']): ?>
-        <p><strong>Durum Bitişi:</strong> <?= format_datetime($managerData['endsAt'], 'd.m.Y H:i') ?></p>
-    <?php endif; ?>
-</section>
-<?php endif; ?>
+<div data-manager-status>
+    <?= render_manager_status_section($managerData) ?>
+</div>
 
-<?php if ($activeMeeting || $nextHighlightedMeeting): ?>
-<section class="card meeting-highlight">
-    <h3>Planlı Görüşme Özeti</h3>
-    <div class="meeting-highlight__grid">
-        <?php if ($activeMeeting): ?>
-            <?php
-                $activeStart = $activeMeeting['scheduled_start'] ? format_datetime($activeMeeting['scheduled_start'], 'd.m H:i') : '-';
-                $activeVisitor = htmlspecialchars($activeMeeting['visitor_name']);
-                if (!empty($activeMeeting['visitor_company'])) {
-                    $activeVisitor .= ' · ' . htmlspecialchars($activeMeeting['visitor_company']);
-                }
-            ?>
-            <div class="meeting-highlight__item is-current">
-                <div class="meeting-highlight__header">
-                    <h4>Aktif Görüşme</h4>
-                    <span class="badge">Devam Ediyor</span>
-                </div>
-                <p class="meeting-highlight__time">Başlangıç: <?= $activeStart ?></p>
-                <p class="meeting-highlight__visitor"><?= $activeVisitor ?></p>
-                <?php if (!empty($activeMeeting['purpose'])): ?>
-                    <p class="meeting-highlight__purpose">Konu: <?= htmlspecialchars($activeMeeting['purpose']) ?></p>
-                <?php endif; ?>
-                <?php if (!empty($activeMeeting['notes'])): ?>
-                    <p class="meeting-highlight__notes">Not: <?= nl2br(htmlspecialchars($activeMeeting['notes'])) ?></p>
-                <?php endif; ?>
-                <form method="post" class="meeting-highlight__actions">
-                    <input type="hidden" name="action" value="finish_meeting">
-                    <input type="hidden" name="meeting_id" value="<?= (int) $activeMeeting['id'] ?>">
-                    <button class="button small" type="submit">Görüşmeyi Bitir</button>
-                </form>
-            </div>
-        <?php endif; ?>
-
-        <?php if ($nextHighlightedMeeting): ?>
-            <?php
-                $nextStart = $nextHighlightedMeeting['scheduled_start'] ? format_datetime($nextHighlightedMeeting['scheduled_start'], 'd.m H:i') : '-';
-                $nextVisitor = htmlspecialchars($nextHighlightedMeeting['visitor_name']);
-                if (!empty($nextHighlightedMeeting['visitor_company'])) {
-                    $nextVisitor .= ' · ' . htmlspecialchars($nextHighlightedMeeting['visitor_company']);
-                }
-                $isTodayLabel = !empty($nextHighlightedMeeting['is_today']) ? ' (Bugün)' : '';
-            ?>
-            <div class="meeting-highlight__item is-next">
-                <div class="meeting-highlight__header">
-                    <h4>Sıradaki Görüşme<?= $isTodayLabel ?></h4>
-                    <span class="badge">Planlandı</span>
-                </div>
-                <p class="meeting-highlight__time">Başlangıç: <?= $nextStart ?></p>
-                <p class="meeting-highlight__visitor"><?= $nextVisitor ?></p>
-                <?php if (!empty($nextHighlightedMeeting['purpose'])): ?>
-                    <p class="meeting-highlight__purpose">Konu: <?= htmlspecialchars($nextHighlightedMeeting['purpose']) ?></p>
-                <?php endif; ?>
-                <?php if (!empty($nextHighlightedMeeting['notes'])): ?>
-                    <p class="meeting-highlight__notes">Not: <?= nl2br(htmlspecialchars($nextHighlightedMeeting['notes'])) ?></p>
-                <?php endif; ?>
-                <?php if ($nextHighlightedMeeting['status'] === 'planned'): ?>
-                    <form method="post" class="meeting-highlight__actions">
-                        <input type="hidden" name="action" value="start_meeting">
-                        <input type="hidden" name="meeting_id" value="<?= (int) $nextHighlightedMeeting['id'] ?>">
-                        <button class="button small secondary" type="submit">Görüşmeyi Başlat</button>
-                    </form>
-                <?php endif; ?>
-            </div>
-        <?php endif; ?>
-    </div>
-</section>
-<?php endif; ?>
+<div data-manager-highlight>
+    <?= render_manager_highlight_section($activeMeeting, $nextHighlightedMeeting) ?>
+</div>
 
 <section class="card">
     <h3>Durumumu Güncelle</h3>
@@ -322,77 +438,9 @@ include __DIR__ . '/partials/header.php';
     </form>
 </section>
 
-<section class="card">
-    <h3>Planlı Görüşmelerim</h3>
-    <?php if (!$upcomingMeetings): ?>
-        <p>Yaklaşan planlı görüşmeniz bulunmuyor.</p>
-    <?php else: ?>
-        <div class="table-scroll">
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>Başlangıç</th>
-                        <th>Durum</th>
-                        <th>Misafir</th>
-                        <th>Konu / Not</th>
-                        <th>İşlem</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($upcomingMeetings as $meeting): ?>
-                        <?php
-                            $startLabel = $meeting['scheduled_start'] ? format_datetime($meeting['scheduled_start'], 'd.m H:i') : '-';
-                            $visitor = htmlspecialchars($meeting['visitor_name']);
-                            if (!empty($meeting['visitor_company'])) {
-                                $visitor .= ' · ' . htmlspecialchars($meeting['visitor_company']);
-                            }
-                            $details = [];
-                            if (!empty($meeting['purpose'])) {
-                                $details[] = htmlspecialchars($meeting['purpose']);
-                            }
-                            if (!empty($meeting['notes'])) {
-                                $details[] = nl2br(htmlspecialchars($meeting['notes']));
-                            }
-                        ?>
-                        <tr>
-                            <td><?= $startLabel ?></td>
-                            <td><span class="badge"><?= htmlspecialchars($meeting['status_label']) ?></span></td>
-                            <td><?= $visitor ?></td>
-                            <td>
-                                <?php if ($details): ?>
-                                    <?php foreach ($details as $line): ?>
-                                        <div><?= $line ?></div>
-                                    <?php endforeach; ?>
-                                <?php else: ?>
-                                    -
-                                <?php endif; ?>
-                            </td>
-                            <td>
-                                <div class="table-actions">
-                                    <?php if ($meeting['status'] === 'planned'): ?>
-                                        <form method="post">
-                                            <input type="hidden" name="action" value="start_meeting">
-                                            <input type="hidden" name="meeting_id" value="<?= (int) $meeting['id'] ?>">
-                                            <button class="button small secondary" type="submit">Başlat</button>
-                                        </form>
-                                    <?php elseif ($meeting['status'] === 'in_progress'): ?>
-                                        <form method="post">
-                                            <input type="hidden" name="action" value="finish_meeting">
-                                            <input type="hidden" name="meeting_id" value="<?= (int) $meeting['id'] ?>">
-                                            <button class="button small" type="submit">Bitir</button>
-                                        </form>
-                                    <?php else: ?>
-                                        <span class="table-subtext">-</span>
-                                    <?php endif; ?>
-                                </div>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
-    <?php endif; ?>
-</section>
+<div data-manager-meetings>
+    <?= render_manager_meetings_section($upcomingMeetings) ?>
+</div>
 
 <section class="card">
     <h3>Takvim</h3>
@@ -433,6 +481,9 @@ window.managerCalendarMeetings = <?= json_encode($calendarMeetings, JSON_HEX_TAG
 (function () {
     const calendarRoot = document.querySelector('[data-calendar]');
     if (!calendarRoot) {
+        window.managerCalendarController = {
+            setMeetings() {},
+        };
         return;
     }
 
@@ -445,17 +496,22 @@ window.managerCalendarMeetings = <?= json_encode($calendarMeetings, JSON_HEX_TAG
     const todayBtn = calendarRoot.querySelector('[data-calendar-today]');
 
     const rawMeetings = Array.isArray(window.managerCalendarMeetings) ? window.managerCalendarMeetings : [];
-    const meetings = rawMeetings.map((item) => ({
-        id: item.id,
-        visitor: item.visitor,
-        company: item.company,
-        purpose: item.purpose,
-        notes: item.notes,
-        status: item.status,
-        statusLabel: item.statusLabel,
-        start: item.start ? new Date(item.start) : null,
-        end: item.end ? new Date(item.end) : null,
-    }));
+
+    function normalizeMeetings(source) {
+        return source.map((item) => ({
+            id: item.id,
+            visitor: item.visitor,
+            company: item.company,
+            purpose: item.purpose,
+            notes: item.notes,
+            status: item.status,
+            statusLabel: item.statusLabel,
+            start: item.start ? new Date(item.start) : null,
+            end: item.end ? new Date(item.end) : null,
+        }));
+    }
+
+    let meetings = normalizeMeetings(rawMeetings);
 
     let currentMonth = new Date();
     currentMonth.setDate(1);
@@ -631,8 +687,71 @@ window.managerCalendarMeetings = <?= json_encode($calendarMeetings, JSON_HEX_TAG
         renderDetails();
     });
 
+    function setMeetings(newData) {
+        const safeData = Array.isArray(newData) ? newData : [];
+        window.managerCalendarMeetings = safeData;
+        meetings = normalizeMeetings(safeData);
+        renderCalendar();
+        renderDetails();
+    }
+
+    window.managerCalendarController = {
+        setMeetings,
+    };
+
     renderCalendar();
     renderDetails();
+})();
+</script>
+
+<script>
+(function () {
+    const refreshUrl = '<?= htmlspecialchars(url_for('admin/manager.php?refresh=1'), ENT_QUOTES, 'UTF-8') ?>';
+    const statusContainer = document.querySelector('[data-manager-status]');
+    const highlightContainer = document.querySelector('[data-manager-highlight]');
+    const meetingsContainer = document.querySelector('[data-manager-meetings]');
+    const refreshIntervalMs = 15000;
+    let refreshTimer = null;
+
+    function updateSection(container, html) {
+        if (!container || typeof html !== 'string') {
+            return;
+        }
+        const trimmed = html.trim();
+        if (container.innerHTML.trim() === trimmed) {
+            return;
+        }
+        container.innerHTML = trimmed;
+    }
+
+    async function performRefresh() {
+        try {
+            const response = await fetch(refreshUrl, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+            });
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            const payload = await response.json();
+            updateSection(statusContainer, payload.statusHtml ?? '');
+            updateSection(highlightContainer, payload.highlightHtml ?? '');
+            updateSection(meetingsContainer, payload.meetingsHtml ?? '');
+            if (payload.calendarMeetings && window.managerCalendarController) {
+                window.managerCalendarController.setMeetings(payload.calendarMeetings);
+            }
+        } catch (error) {
+            console.error('Panel verileri güncellenemedi:', error);
+        } finally {
+            refreshTimer = window.setTimeout(performRefresh, refreshIntervalMs);
+        }
+    }
+
+    refreshTimer = window.setTimeout(performRefresh, refreshIntervalMs);
 })();
 </script>
 

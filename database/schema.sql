@@ -127,5 +127,7 @@ INSERT INTO settings (`key`, `value`) VALUES
     ('theme_secondary', '#17007A'),
     ('signage_refresh_seconds', '5'),
     ('time_format', '24h'),
-    ('ticker_speed', '40')
+    ('ticker_speed', '40'),
+    ('ticker_font_size', '24'),
+    ('ticker_band_height', '70')
 ON DUPLICATE KEY UPDATE `value` = VALUES(`value`);
