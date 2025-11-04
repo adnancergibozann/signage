@@ -150,6 +150,12 @@ body {
     font-weight: 600;
 }
 
+.button.small {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    border-radius: 10px;
+}
+
 .button.secondary {
     background: rgba(23, 0, 122, 0.3);
 }
@@ -197,6 +203,59 @@ form .actions {
 .table-actions {
     display: flex;
     gap: 8px;
+}
+
+.meeting-highlight__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 18px;
+    margin-top: 16px;
+}
+
+.meeting-highlight__item {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.meeting-highlight__item.is-current {
+    border-left: 3px solid var(--gap-primary);
+}
+
+.meeting-highlight__item.is-next {
+    border-left: 3px solid var(--gap-secondary);
+}
+
+.meeting-highlight__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.meeting-highlight__time {
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.meeting-highlight__visitor {
+    font-size: 0.95rem;
+}
+
+.meeting-highlight__purpose,
+.meeting-highlight__notes {
+    font-size: 0.9rem;
+    color: var(--gap-muted);
+}
+
+.meeting-highlight__actions {
+    margin-top: auto;
+    display: flex;
+    gap: 10px;
 }
 
 .user-update-form {

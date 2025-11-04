@@ -8,6 +8,12 @@ function format_signage_meeting(array $meeting, DateTimeImmutable $now): array
 {
     $status = $meeting['status'] ?? 'planned';
     $statusLabel = $meeting['statusLabel'] ?? meeting_status_label($status);
+    $position = $meeting['position'] ?? null;
+    $positionLabel = $meeting['positionLabel'] ?? match ($position) {
+        'current' => 'Aktif Görüşme',
+        'next' => 'Sıradaki Görüşme',
+        default => $statusLabel,
+    };
 
     $scheduledStart = $meeting['scheduledStart'] ?? $meeting['scheduled_start'] ?? null;
     $scheduledEnd = $meeting['scheduledEnd'] ?? $meeting['scheduled_end'] ?? null;
@@ -51,6 +57,8 @@ function format_signage_meeting(array $meeting, DateTimeImmutable $now): array
         'id' => isset($meeting['id']) ? (int) $meeting['id'] : null,
         'status' => $status,
         'statusLabel' => $statusLabel,
+        'position' => $position,
+        'positionLabel' => $positionLabel,
         'visitorName' => $meeting['visitorName'] ?? null,
         'visitorCompany' => $meeting['visitorCompany'] ?? null,
         'purpose' => $meeting['purpose'] ?? null,
@@ -144,7 +152,16 @@ function fetch_managers_with_status(PDO $pdo, DateTimeImmutable $now, array $set
         }
 
         $managerId = (int) $row['id'];
-        $nextMeeting = $nextMeetings[$managerId] ?? null;
+        $meetingSet = $nextMeetings[$managerId] ?? ['current' => null, 'next' => null];
+        $currentMeeting = $meetingSet['current'] ?? null;
+        $nextMeeting = $meetingSet['next'] ?? null;
+        if ($currentMeeting) {
+            $currentMeeting['position'] = $currentMeeting['position'] ?? 'current';
+        }
+        if ($nextMeeting) {
+            $nextMeeting['position'] = $nextMeeting['position'] ?? 'next';
+        }
+        $currentMeetingData = $currentMeeting ? format_signage_meeting($currentMeeting, $now) : null;
         $nextMeetingData = $nextMeeting ? format_signage_meeting($nextMeeting, $now) : null;
 
         $managers[] = [
@@ -159,6 +176,7 @@ function fetch_managers_with_status(PDO $pdo, DateTimeImmutable $now, array $set
             'remainingSeconds' => $remainingSeconds,
             'endsAt' => $endsAt,
             'startedAt' => $startedAt,
+            'currentMeeting' => $currentMeetingData,
             'nextMeeting' => $nextMeetingData,
         ];
     }

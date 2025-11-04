@@ -182,6 +182,26 @@ function fetch_scheduled_meetings(PDO $pdo, array $options = []): array
     return $rows;
 }
 
+function find_scheduled_meeting(PDO $pdo, int $meetingId): ?array
+{
+    $stmt = $pdo->prepare('SELECT m.*, u.full_name AS manager_name, u.role AS manager_role, u.department AS manager_department
+        FROM scheduled_meetings m
+        INNER JOIN users u ON u.id = m.manager_id
+        WHERE m.id = :id');
+    $stmt->execute(['id' => $meetingId]);
+    $meeting = $stmt->fetch();
+
+    if (!$meeting) {
+        return null;
+    }
+
+    $meeting['id'] = (int) $meeting['id'];
+    $meeting['manager_id'] = (int) $meeting['manager_id'];
+    $meeting['status_label'] = meeting_status_label($meeting['status']);
+
+    return $meeting;
+}
+
 function fetch_next_meetings_for_managers(PDO $pdo, array $managerIds, DateTimeImmutable $reference): array
 {
     if (!$managerIds) {
@@ -197,6 +217,7 @@ function fetch_next_meetings_for_managers(PDO $pdo, array $managerIds, DateTimeI
     foreach (array_keys($managerIds) as $index) {
         $placeholders[] = ':manager' . $index;
     }
+
     $sql = 'SELECT m.*
         FROM scheduled_meetings m
         WHERE m.manager_id IN (' . implode(',', $placeholders) . ')
@@ -206,7 +227,9 @@ function fetch_next_meetings_for_managers(PDO $pdo, array $managerIds, DateTimeI
                 OR m.scheduled_start >= :reference
                 OR (m.scheduled_end IS NOT NULL AND m.scheduled_end >= :reference)
             )
-        ORDER BY m.manager_id, m.scheduled_start ASC';
+        ORDER BY m.manager_id,
+            CASE WHEN m.status = "in_progress" THEN 0 ELSE 1 END,
+            m.scheduled_start ASC';
 
     $stmt = $pdo->prepare($sql);
     foreach ($managerIds as $index => $id) {
@@ -215,13 +238,19 @@ function fetch_next_meetings_for_managers(PDO $pdo, array $managerIds, DateTimeI
     $stmt->bindValue(':reference', $reference->format('Y-m-d H:i:s'));
     $stmt->execute();
 
-    $next = [];
+    $results = [];
+    $todayString = $reference->format('Y-m-d');
+
     foreach ($stmt as $row) {
         $managerId = (int) $row['manager_id'];
-        if (isset($next[$managerId])) {
-            continue;
+        if (!isset($results[$managerId])) {
+            $results[$managerId] = [
+                'current' => null,
+                'next' => null,
+            ];
         }
-        $next[$managerId] = [
+
+        $normalized = [
             'id' => (int) $row['id'],
             'status' => $row['status'],
             'statusLabel' => meeting_status_label($row['status']),
@@ -231,10 +260,44 @@ function fetch_next_meetings_for_managers(PDO $pdo, array $managerIds, DateTimeI
             'notes' => $row['notes'],
             'scheduledStart' => $row['scheduled_start'],
             'scheduledEnd' => $row['scheduled_end'],
+            'managerId' => $managerId,
         ];
+
+        $isSameDay = false;
+        if (!empty($row['scheduled_start'])) {
+            try {
+                $start = new DateTimeImmutable((string) $row['scheduled_start']);
+                $isSameDay = $start->format('Y-m-d') === $todayString;
+            } catch (Throwable) {
+                $isSameDay = false;
+            }
+        }
+
+        if ($row['status'] === 'in_progress' && $results[$managerId]['current'] === null) {
+            $normalized['position'] = 'current';
+            $results[$managerId]['current'] = $normalized;
+            continue;
+        }
+
+        if ($row['status'] === 'planned') {
+            $normalized['position'] = 'next';
+            $normalized['_is_today'] = $isSameDay;
+            $existingNext = $results[$managerId]['next'];
+            if ($existingNext === null
+                || (!$existingNext['_is_today'] && $isSameDay)
+                || ($existingNext['_is_today'] === $isSameDay && $existingNext['scheduledStart'] > $row['scheduled_start'])) {
+                $results[$managerId]['next'] = $normalized;
+            }
+        }
     }
 
-    return $next;
+    foreach ($results as &$items) {
+        if (isset($items['next']['_is_today'])) {
+            unset($items['next']['_is_today']);
+        }
+    }
+
+    return $results;
 }
 
 function fetch_next_global_meeting(PDO $pdo, DateTimeImmutable $reference): ?array

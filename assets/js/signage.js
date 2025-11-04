@@ -193,15 +193,38 @@ function renderManagers(managers) {
             card.appendChild(note);
         }
 
-        if (manager.nextMeeting) {
-            const meeting = manager.nextMeeting;
-            const meetingBox = document.createElement('div');
+        const meetingWidgets = [];
+        const hasCurrent = Boolean(manager.currentMeeting);
+        const hasNext = Boolean(manager.nextMeeting);
+        let isSameMeeting = false;
+        if (hasCurrent && hasNext) {
+            const current = manager.currentMeeting;
+            const next = manager.nextMeeting;
+            if (current.id && next.id) {
+                isSameMeeting = current.id === next.id;
+            } else if (current.scheduledStartIso && next.scheduledStartIso) {
+                isSameMeeting = current.scheduledStartIso === next.scheduledStartIso
+                    && (current.visitorName || '') === (next.visitorName || '');
+            }
+        }
+        if (hasCurrent) {
+            meetingWidgets.push(manager.currentMeeting);
+        }
+        if (hasNext && !isSameMeeting) {
+            meetingWidgets.push(manager.nextMeeting);
+        }
+
+        meetingWidgets.forEach((meeting) => {
             const statusClass = meeting.status ? meeting.status.replace(/_/g, '-') : '';
+            const meetingBox = document.createElement('div');
             meetingBox.className = `next-meeting next-meeting--ticker${statusClass ? ` ${statusClass}` : ''}`;
+            if (meeting.position) {
+                meetingBox.classList.add(`is-${meeting.position}`);
+            }
 
             const label = document.createElement('div');
             label.className = 'next-meeting__label';
-            label.textContent = meeting.statusLabel || 'Planlı Görüşme';
+            label.textContent = meeting.positionLabel || meeting.statusLabel || 'Planlı Görüşme';
             meetingBox.appendChild(label);
 
             const ticker = document.createElement('div');
@@ -218,7 +241,7 @@ function renderManagers(managers) {
             meetingBox.appendChild(ticker);
 
             card.appendChild(meetingBox);
-        }
+        });
 
         if (manager.remainingSeconds !== null) {
             const countdown = document.createElement('div');

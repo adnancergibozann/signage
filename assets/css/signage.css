@@ -188,6 +188,14 @@ body {
     border-left-color: var(--gap-primary);
 }
 
+.next-meeting.is-current {
+    border-left-color: var(--gap-primary);
+}
+
+.next-meeting.is-next {
+    border-left-color: var(--gap-secondary);
+}
+
 .next-meeting.completed {
     border-left-color: #2ecc71;
 }

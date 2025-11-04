@@ -120,7 +120,26 @@ $formatMeetingTicker = static function (array $meeting) use ($formatMeetingTime)
                                 $photo = $manager['photoUrl'] ? htmlspecialchars($manager['photoUrl'], ENT_QUOTES) : $placeholderProfile;
                                 $note = $manager['note'] ?? null;
                                 $remaining = $manager['remainingSeconds'] ?? null;
+                                $currentMeeting = $manager['currentMeeting'] ?? null;
                                 $nextMeeting = $manager['nextMeeting'] ?? null;
+                                $meetingWidgets = [];
+                                if ($currentMeeting) {
+                                    $meetingWidgets[] = $currentMeeting;
+                                }
+                                if ($nextMeeting) {
+                                    $sameMeeting = false;
+                                    if ($currentMeeting) {
+                                        if (!empty($currentMeeting['id']) && !empty($nextMeeting['id'])) {
+                                            $sameMeeting = $currentMeeting['id'] === $nextMeeting['id'];
+                                        } elseif (!empty($currentMeeting['scheduledStartIso']) && !empty($nextMeeting['scheduledStartIso'])) {
+                                            $sameMeeting = $currentMeeting['scheduledStartIso'] === $nextMeeting['scheduledStartIso']
+                                                && (($currentMeeting['visitorName'] ?? '') === ($nextMeeting['visitorName'] ?? ''));
+                                        }
+                                    }
+                                    if (!$sameMeeting) {
+                                        $meetingWidgets[] = $nextMeeting;
+                                    }
+                                }
                                 $cardAttrs = sprintf('class="manager-card %s" data-status-label="%s"', $statusClass, $statusLabel);
                             ?>
                             <article <?= $cardAttrs ?>>
@@ -134,15 +153,16 @@ $formatMeetingTicker = static function (array $meeting) use ($formatMeetingTime)
                                 <?php if ($note): ?>
                                     <div class="status-note"><?= htmlspecialchars($note) ?></div>
                                 <?php endif; ?>
-                                <?php if ($nextMeeting): ?>
+                                <?php foreach ($meetingWidgets as $meeting): ?>
                                     <?php
-                                        $meetingStatus = $nextMeeting['status'] ?? '';
+                                        $meetingStatus = $meeting['status'] ?? '';
                                         $meetingClass = $meetingStatus ? ' ' . htmlspecialchars(str_replace('_', '-', $meetingStatus)) : '';
-                                        $meetingLabel = htmlspecialchars($nextMeeting['statusLabel'] ?? 'Planlı Görüşme');
-                                        $tickerText = $formatMeetingTicker($nextMeeting);
+                                        $positionClass = !empty($meeting['position']) ? ' is-' . htmlspecialchars($meeting['position']) : '';
+                                        $meetingLabel = htmlspecialchars($meeting['positionLabel'] ?? $meeting['statusLabel'] ?? 'Planlı Görüşme');
+                                        $tickerText = $formatMeetingTicker($meeting);
                                         $tickerText = $tickerText !== '' ? $tickerText : 'Planlı görüşme bilgisi bekleniyor.';
                                     ?>
-                                    <div class="next-meeting next-meeting--ticker<?= $meetingClass ?>">
+                                    <div class="next-meeting next-meeting--ticker<?= $meetingClass ?><?= $positionClass ?>">
                                         <div class="next-meeting__label"><?= $meetingLabel ?></div>
                                         <div class="next-meeting__ticker">
                                             <div class="next-meeting__track">
@@ -151,7 +171,7 @@ $formatMeetingTicker = static function (array $meeting) use ($formatMeetingTime)
                                             </div>
                                         </div>
                                     </div>
-                                <?php endif; ?>
+                                <?php endforeach; ?>
                                 <?php if ($remaining !== null): ?>
                                     <div class="countdown">
                                         <?php
