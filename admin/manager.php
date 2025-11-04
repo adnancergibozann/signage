@@ -178,6 +178,31 @@ foreach ($upcomingMeetings as $candidate) {
 
 $nextHighlightedMeeting = $nextSameDayMeeting ?? $nextMeetingFallback;
 
+$calendarAnchor = new DateTimeImmutable($now->format('Y-m-01 00:00:00'));
+$calendarRangeStart = $calendarAnchor->modify('-1 month');
+$calendarRangeEnd = $calendarAnchor->modify('+3 months')->modify('-1 second');
+$calendarMeetingsRaw = fetch_scheduled_meetings($pdo, [
+    'manager_id' => $user['id'],
+    'from' => $calendarRangeStart,
+    'to' => $calendarRangeEnd,
+    'status_in' => meeting_status_options(),
+    'order' => 'ASC',
+]);
+
+$calendarMeetings = array_map(static function (array $meeting): array {
+    return [
+        'id' => (int) $meeting['id'],
+        'visitor' => $meeting['visitor_name'] ?? '',
+        'company' => $meeting['visitor_company'] ?? '',
+        'purpose' => $meeting['purpose'] ?? '',
+        'notes' => $meeting['notes'] ?? '',
+        'status' => $meeting['status'],
+        'statusLabel' => $meeting['status_label'] ?? meeting_status_label($meeting['status']),
+        'start' => $meeting['scheduled_start'],
+        'end' => $meeting['scheduled_end'],
+    ];
+}, $calendarMeetingsRaw);
+
 include __DIR__ . '/partials/header.php';
 ?>
 <?php if ($message): ?><div class="alert success"><?= htmlspecialchars($message) ?></div><?php endif; ?>
@@ -368,5 +393,248 @@ include __DIR__ . '/partials/header.php';
         </div>
     <?php endif; ?>
 </section>
+
+<section class="card">
+    <h3>Takvim</h3>
+    <div class="calendar-layout" data-calendar>
+        <div class="calendar-main">
+            <div class="calendar-header">
+                <button type="button" class="calendar-nav" data-calendar-prev aria-label="Önceki ay">‹</button>
+                <div class="calendar-title" data-calendar-title></div>
+                <button type="button" class="calendar-nav" data-calendar-next aria-label="Sonraki ay">›</button>
+            </div>
+            <div class="calendar-weekdays">
+                <span>Pzt</span>
+                <span>Sal</span>
+                <span>Çar</span>
+                <span>Per</span>
+                <span>Cum</span>
+                <span>Cmt</span>
+                <span>Paz</span>
+            </div>
+            <div class="calendar-grid" data-calendar-grid></div>
+            <div class="calendar-footer">
+                <button type="button" class="calendar-today" data-calendar-today>Bugüne Git</button>
+            </div>
+        </div>
+        <aside class="calendar-details">
+            <h4 data-calendar-detail-title>Gün seçiniz</h4>
+            <div class="calendar-detail-list" data-calendar-detail-list>
+                <p class="calendar-empty">Görüntülemek için takvimden bir gün seçiniz.</p>
+            </div>
+        </aside>
+    </div>
+</section>
+
+<script>
+window.managerCalendarMeetings = <?= json_encode($calendarMeetings, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+</script>
+<script>
+(function () {
+    const calendarRoot = document.querySelector('[data-calendar]');
+    if (!calendarRoot) {
+        return;
+    }
+
+    const titleEl = calendarRoot.querySelector('[data-calendar-title]');
+    const gridEl = calendarRoot.querySelector('[data-calendar-grid]');
+    const detailTitleEl = calendarRoot.querySelector('[data-calendar-detail-title]');
+    const detailListEl = calendarRoot.querySelector('[data-calendar-detail-list]');
+    const prevBtn = calendarRoot.querySelector('[data-calendar-prev]');
+    const nextBtn = calendarRoot.querySelector('[data-calendar-next]');
+    const todayBtn = calendarRoot.querySelector('[data-calendar-today]');
+
+    const rawMeetings = Array.isArray(window.managerCalendarMeetings) ? window.managerCalendarMeetings : [];
+    const meetings = rawMeetings.map((item) => ({
+        id: item.id,
+        visitor: item.visitor,
+        company: item.company,
+        purpose: item.purpose,
+        notes: item.notes,
+        status: item.status,
+        statusLabel: item.statusLabel,
+        start: item.start ? new Date(item.start) : null,
+        end: item.end ? new Date(item.end) : null,
+    }));
+
+    let currentMonth = new Date();
+    currentMonth.setDate(1);
+    let selectedDate = new Date();
+    selectedDate.setHours(0, 0, 0, 0);
+
+    function isSameDay(a, b) {
+        return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+    }
+
+    function getDayRange(date) {
+        const start = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+        const end = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+        return { start, end };
+    }
+
+    function eventsForDate(date) {
+        const range = getDayRange(date);
+        return meetings.filter((meeting) => {
+            if (!meeting.start) {
+                return false;
+            }
+            const start = meeting.start;
+            const end = meeting.end || meeting.start;
+            return start <= range.end && end >= range.start;
+        });
+    }
+
+    let visibleCells = [];
+
+    function renderDetails() {
+        if (!detailTitleEl || !detailListEl) {
+            return;
+        }
+
+        const formatter = new Intl.DateTimeFormat('tr-TR', {
+            weekday: 'long',
+            day: 'numeric',
+            month: 'long',
+        });
+        detailTitleEl.textContent = formatter.format(selectedDate);
+
+        const dayEvents = eventsForDate(selectedDate).sort((a, b) => {
+            const aTime = a.start ? a.start.getTime() : 0;
+            const bTime = b.start ? b.start.getTime() : 0;
+            return aTime - bTime;
+        });
+
+        detailListEl.innerHTML = '';
+        if (!dayEvents.length) {
+            const empty = document.createElement('p');
+            empty.className = 'calendar-empty';
+            empty.textContent = 'Bu gün için planlı görüşme bulunmuyor.';
+            detailListEl.appendChild(empty);
+            return;
+        }
+
+        dayEvents.forEach((event) => {
+            const item = document.createElement('article');
+            item.className = 'calendar-event';
+
+            const timeParts = [];
+            if (event.start) {
+                timeParts.push(event.start.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }));
+            }
+            if (event.end) {
+                timeParts.push(event.end.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }));
+            }
+
+            item.innerHTML = `
+                <header>
+                    <div class="calendar-event-time">${timeParts.join(' - ')}</div>
+                    <div class="calendar-event-status">${event.statusLabel || ''}</div>
+                </header>
+                <div class="calendar-event-body">
+                    <strong>${event.visitor ? event.visitor : 'Misafir bilgisi yok'}</strong>
+                    ${event.company ? `<div class="calendar-event-sub">${event.company}</div>` : ''}
+                    ${event.purpose ? `<div class="calendar-event-note">${event.purpose}</div>` : ''}
+                    ${event.notes ? `<div class="calendar-event-note">${event.notes}</div>` : ''}
+                </div>
+            `;
+
+            detailListEl.appendChild(item);
+        });
+    }
+
+    function updateSelection() {
+        visibleCells.forEach((entry) => {
+            if (isSameDay(entry.date, selectedDate)) {
+                entry.element.classList.add('is-selected');
+            } else {
+                entry.element.classList.remove('is-selected');
+            }
+        });
+    }
+
+    function renderCalendar() {
+        if (!titleEl || !gridEl) {
+            return;
+        }
+
+        const formatter = new Intl.DateTimeFormat('tr-TR', {
+            month: 'long',
+            year: 'numeric',
+        });
+        titleEl.textContent = formatter.format(currentMonth);
+
+        gridEl.innerHTML = '';
+        visibleCells = [];
+
+        const firstDay = new Date(currentMonth);
+        const startOffset = (firstDay.getDay() + 6) % 7;
+        for (let i = 0; i < startOffset; i += 1) {
+            const filler = document.createElement('div');
+            filler.className = 'calendar-day filler';
+            gridEl.appendChild(filler);
+        }
+
+        const daysInMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate();
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        for (let day = 1; day <= daysInMonth; day += 1) {
+            const cellDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+            const cell = document.createElement('button');
+            cell.type = 'button';
+            cell.className = 'calendar-day';
+            cell.innerHTML = `<span class="calendar-day-number">${day}</span>`;
+
+            const dayEvents = eventsForDate(cellDate);
+            if (dayEvents.length) {
+                cell.classList.add('has-meetings');
+                cell.innerHTML += `<span class="calendar-day-count">${dayEvents.length}</span>`;
+            }
+
+            if (isSameDay(cellDate, today)) {
+                cell.classList.add('is-today');
+            }
+
+            cell.addEventListener('click', () => {
+                selectedDate = new Date(cellDate.getFullYear(), cellDate.getMonth(), cellDate.getDate());
+                updateSelection();
+                renderDetails();
+            });
+
+            gridEl.appendChild(cell);
+            visibleCells.push({ date: cellDate, element: cell });
+        }
+
+        updateSelection();
+    }
+
+    prevBtn?.addEventListener('click', () => {
+        currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1);
+        renderCalendar();
+        updateSelection();
+        renderDetails();
+    });
+
+    nextBtn?.addEventListener('click', () => {
+        currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1);
+        renderCalendar();
+        updateSelection();
+        renderDetails();
+    });
+
+    todayBtn?.addEventListener('click', () => {
+        const today = new Date();
+        currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        selectedDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        renderCalendar();
+        updateSelection();
+        renderDetails();
+    });
+
+    renderCalendar();
+    renderDetails();
+})();
+</script>
+
 <?php
 include __DIR__ . '/partials/footer.php';
