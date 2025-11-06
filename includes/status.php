@@ -26,6 +26,19 @@ function map_status_label(string $status): string
     };
 }
 
+function set_manager_display_order(PDO $pdo, int $managerId, ?int $displayOrder): void
+{
+    ensure_manager_status_row($managerId);
+    $stmt = $pdo->prepare('UPDATE manager_statuses SET display_order = :display_order, updated_at = NOW() WHERE user_id = :id');
+    if ($displayOrder === null) {
+        $stmt->bindValue('display_order', null, PDO::PARAM_NULL);
+    } else {
+        $stmt->bindValue('display_order', $displayOrder, PDO::PARAM_INT);
+    }
+    $stmt->bindValue('id', $managerId, PDO::PARAM_INT);
+    $stmt->execute();
+}
+
 function update_manager_status(
     PDO $pdo,
     int $managerId,

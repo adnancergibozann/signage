@@ -602,7 +602,7 @@ function render_secretary_status_rows(array $managers): string
     if (!$managers) {
         ?>
         <tr>
-            <td colspan="6">Tanımlı yönetici bulunmuyor.</td>
+            <td colspan="7">Tanımlı yönetici bulunmuyor.</td>
         </tr>
         <?php
     } else {
@@ -615,6 +615,7 @@ function render_secretary_status_rows(array $managers): string
                     <small><?= htmlspecialchars(role_label($manager['role'])) ?></small>
                 </td>
                 <td><?= htmlspecialchars($manager['department'] ?? '') ?></td>
+                <td><?= $manager['displayOrder'] !== null ? htmlspecialchars((string) $manager['displayOrder']) : '-' ?></td>
                 <td><span class="badge"><?= htmlspecialchars($manager['statusLabel']) ?></span></td>
                 <td><?= htmlspecialchars($manager['note'] ?? '') ?></td>
                 <td>
@@ -900,6 +901,7 @@ include __DIR__ . '/partials/header.php';
                             <th>Seç</th>
                             <th>Ad</th>
                             <th>Departman</th>
+                            <th>Ekran Sırası</th>
                             <th>Durum</th>
                             <th>Not</th>
                             <th>Kalan Süre</th>

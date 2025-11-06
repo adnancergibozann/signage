@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS manager_statuses (
     state_started_at DATETIME NULL,
     state_ends_at DATETIME NULL,
     note VARCHAR(255) NULL,
+    display_order INT NULL DEFAULT NULL,
     active_meeting_id INT UNSIGNED NULL,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_status_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE

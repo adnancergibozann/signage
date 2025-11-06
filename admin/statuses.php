@@ -20,6 +20,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $status = $_POST['status'] ?? 'available';
     $duration = isset($_POST['duration']) ? max(0, (int) $_POST['duration']) : null;
     $note = trim($_POST['note'] ?? '');
+    $displayOrderInput = trim((string) ($_POST['display_order'] ?? ''));
+    $displayOrder = null;
+    if ($displayOrderInput !== '') {
+        $displayOrder = (int) $displayOrderInput;
+        if ($displayOrder < 0) {
+            $displayOrder = 0;
+        }
+    }
     $endsAtInput = $_POST['ends_at'] ?? '';
     $endsAt = null;
     if ($endsAtInput !== '') {
@@ -42,13 +50,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($duration !== null && $duration <= 0) {
             $duration = null;
         }
+        $orderStmt = $pdo->prepare('SELECT display_order FROM manager_statuses WHERE user_id = :id');
+        $orderStmt->execute(['id' => $managerId]);
+        $previousOrderRaw = $orderStmt->fetchColumn();
+        $previousOrder = $previousOrderRaw === false ? null : ($previousOrderRaw !== null ? (int) $previousOrderRaw : null);
+
         update_manager_status($pdo, $managerId, $status, $endsAt, $note ?: null, $duration);
+        set_manager_display_order($pdo, $managerId, $displayOrder);
+        $orderChanged = $previousOrder !== $displayOrder;
         record_syslog('status.override', sprintf('%s için durum %s olarak güncellendi.', $managerRow['full_name'], map_status_label($status)), null, [
             'targetUserId' => $managerId,
             'status' => $status,
             'durationMinutes' => $duration,
+            'displayOrder' => $displayOrder,
+            'previousDisplayOrder' => $previousOrder,
         ]);
-        $message = 'Durum güncellendi.';
+        if ($orderChanged) {
+            record_syslog('status.display_order', sprintf('%s için ekran sırası %s olarak ayarlandı.', $managerRow['full_name'], $displayOrder !== null ? $displayOrder : 'varsayılan'), null, [
+                'targetUserId' => $managerId,
+                'displayOrder' => $displayOrder,
+                'previousDisplayOrder' => $previousOrder,
+            ]);
+        }
+        $message = $orderChanged ? 'Durum ve ekran sırası güncellendi.' : 'Durum güncellendi.';
     } catch (Throwable $e) {
         $error = $e->getMessage();
     }
@@ -89,6 +113,10 @@ include __DIR__ . '/partials/header.php';
                 <div>
                     <label>Bitiş Tarihi-Saati</label>
                     <input type="datetime-local" name="ends_at" value="<?= $manager['endsAt'] ? (new DateTime($manager['endsAt']))->format('Y-m-d\TH:i') : '' ?>">
+                </div>
+                <div>
+                    <label>Ekran Sırası</label>
+                    <input type="number" name="display_order" min="0" step="1" placeholder="Otomatik" value="<?= $manager['displayOrder'] !== null ? htmlspecialchars((string) $manager['displayOrder']) : '' ?>">
                 </div>
             </div>
             <div class="actions">

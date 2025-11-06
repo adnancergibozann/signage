@@ -141,11 +141,11 @@ function fetch_managers_with_status(PDO $pdo, DateTimeImmutable $now, array $set
 {
     $managerRoles = manager_role_keys();
     $placeholders = implode(',', array_fill(0, count($managerRoles), '?'));
-    $stmt = $pdo->prepare("SELECT u.id, u.full_name, u.department, u.photo_path, u.role, s.status, s.state_started_at, s.state_ends_at, s.note
+    $stmt = $pdo->prepare("SELECT u.id, u.full_name, u.department, u.photo_path, u.role, s.status, s.state_started_at, s.state_ends_at, s.note, s.display_order
         FROM users u
         LEFT JOIN manager_statuses s ON s.user_id = u.id
         WHERE u.role IN ($placeholders)
-        ORDER BY u.full_name");
+        ORDER BY (s.display_order IS NULL) ASC, s.display_order ASC, u.full_name ASC");
     $stmt->execute($managerRoles);
     $rows = $stmt->fetchAll();
 
@@ -189,6 +189,7 @@ function fetch_managers_with_status(PDO $pdo, DateTimeImmutable $now, array $set
             'name' => $row['full_name'],
             'department' => $row['department'],
             'role' => $row['role'],
+            'displayOrder' => $row['display_order'] !== null ? (int) $row['display_order'] : null,
             'status' => $status,
             'statusLabel' => map_status_label($status),
             'photoUrl' => $row['photo_path'] ? asset_url('public/uploads/profile/' . $row['photo_path']) : null,
