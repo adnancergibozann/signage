@@ -316,6 +316,10 @@ form .actions {
     color: rgba(255, 255, 255, 0.65);
 }
 
+.form-help.error {
+    color: #ff9aa2;
+}
+
 .secretary-menu {
     display: flex;
     gap: 12px;

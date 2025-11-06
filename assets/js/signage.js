@@ -120,7 +120,7 @@ function renderSignage(data) {
     applyTheme(data.settings);
     renderClock(data.timestamp, data.settings.timeFormat);
     renderManagers(data.managers);
-    renderAnnouncements(data.announcements);
+    renderAnnouncements(data.announcements, data.settings);
     renderTicker(data.ticker, data.settings);
     renderAlerts(data.alerts);
     renderMedia(data.activeMedia);
@@ -317,7 +317,15 @@ function updateCountdown(el, target) {
     el.textContent = `${minutes}:${seconds}`;
 }
 
-function renderAnnouncements(announcements) {
+function renderAnnouncements(announcements, settings) {
+    const root = document.documentElement;
+    const fontSize = settings?.announcementFontSize;
+    const fontSizeValue = fontSize === null || fontSize === undefined ? NaN : Number.parseFloat(fontSize);
+    if (Number.isFinite(fontSizeValue) && fontSizeValue > 0) {
+        root.style.setProperty('--announcement-font-size', `${fontSizeValue}px`);
+    } else {
+        root.style.removeProperty('--announcement-font-size');
+    }
     const list = document.querySelector('.announcements-list');
     list.innerHTML = '';
     if (!announcements || announcements.length === 0) {

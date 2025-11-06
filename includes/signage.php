@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/status.php';
 require_once __DIR__ . '/meetings.php';
+require_once __DIR__ . '/ticker.php';
 
 function format_signage_meeting(array $meeting, DateTimeImmutable $now): array
 {
@@ -95,12 +96,20 @@ function fetch_signage_state(): array
     if ($tickerBandHeight <= 0) {
         $tickerBandHeight = 70;
     }
+    $announcementFontSize = (int)($settings['announcement_font_size'] ?? 22);
+    if ($announcementFontSize <= 0) {
+        $announcementFontSize = 22;
+    }
 
     $managers = fetch_managers_with_status($pdo, $now, $settings);
     $upcomingMeeting = fetch_next_global_meeting($pdo, $now);
     $nextMeeting = $upcomingMeeting ? format_signage_meeting($upcomingMeeting, $now) : null;
     $announcements = fetch_active_announcements($pdo, $now);
     $tickers = fetch_active_tickers($pdo, $now);
+    $feedTickers = fetch_active_ticker_feed_items($pdo, $now);
+    if ($feedTickers) {
+        $tickers = array_values(array_unique(array_merge($tickers, $feedTickers)));
+    }
     $media = find_active_media($pdo, $now);
     $alerts = build_alerts($settings, $now);
 
@@ -115,6 +124,7 @@ function fetch_signage_state(): array
             'tickerSpeed' => $tickerSpeed,
             'tickerFontSize' => $tickerFontSize,
             'tickerHeight' => $tickerBandHeight,
+            'announcementFontSize' => $announcementFontSize,
             'logoUrl' => $logoPath ? asset_url('public/uploads/branding/' . $logoPath) : null,
             'organigramUrl' => $organigramPath ? asset_url('public/uploads/branding/' . $organigramPath) : null,
         ],

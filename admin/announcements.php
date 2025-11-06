@@ -9,8 +9,11 @@ require_role('super_admin');
 $pageTitle = 'Duyuru Yönetimi';
 $activePage = 'announcements';
 $pdo = get_pdo();
+$settings = load_all_settings();
 $message = null;
 $error = null;
+
+$announcementFontSize = normalize_announcement_font_size((int) ($settings['announcement_font_size'] ?? 22));
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
@@ -24,11 +27,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($action === 'delete') {
             handle_delete_announcement($pdo);
             $message = 'Duyuru silindi.';
+        } elseif ($action === 'update_settings') {
+            $announcementFontSize = handle_update_announcement_settings();
+            $message = 'Duyuru görünümü güncellendi.';
         }
     } catch (Throwable $e) {
         $error = $e->getMessage();
     }
 }
+
+$settings = load_all_settings();
+$announcementFontSize = normalize_announcement_font_size((int) ($settings['announcement_font_size'] ?? $announcementFontSize));
 
 $stmt = $pdo->query('SELECT * FROM announcements ORDER BY priority DESC, created_at DESC');
 $announcements = $stmt->fetchAll();
@@ -37,6 +46,23 @@ include __DIR__ . '/partials/header.php';
 ?>
 <?php if ($message): ?><div class="alert success"><?= htmlspecialchars($message) ?></div><?php endif; ?>
 <?php if ($error): ?><div class="alert error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
+
+<section class="card">
+    <h3>Duyuru Ayarları</h3>
+    <form method="post">
+        <input type="hidden" name="action" value="update_settings">
+        <div class="form-grid">
+            <div>
+                <label for="announcement_font_size">Metin Punto (px)</label>
+                <input type="number" id="announcement_font_size" name="announcement_font_size" min="14" max="72" value="<?= htmlspecialchars((string) $announcementFontSize) ?>" required>
+            </div>
+        </div>
+        <p class="form-help">Seçtiğiniz punto signage ekranındaki duyuru başlık ve içeriklerinde kullanılacaktır.</p>
+        <div class="actions">
+            <button class="button" type="submit">Ayarları Kaydet</button>
+        </div>
+    </form>
+</section>
 
 <section class="card">
     <h3>Yeni Duyuru</h3>
@@ -165,4 +191,27 @@ function handle_delete_announcement(PDO $pdo): void
         throw new RuntimeException('Geçersiz duyuru.');
     }
     $pdo->prepare('DELETE FROM announcements WHERE id = :id')->execute(['id' => $id]);
+}
+
+function handle_update_announcement_settings(): int
+{
+    $fontSize = isset($_POST['announcement_font_size']) ? (int) $_POST['announcement_font_size'] : 22;
+    $fontSize = normalize_announcement_font_size($fontSize);
+
+    set_setting('announcement_font_size', (string) $fontSize);
+
+    record_syslog('announcements.settings.update', 'Duyuru punto ayarı güncellendi.', current_user()['id'] ?? null, [
+        'fontSize' => $fontSize,
+    ]);
+
+    return $fontSize;
+}
+
+function normalize_announcement_font_size(int $fontSize): int
+{
+    if ($fontSize <= 0) {
+        return 22;
+    }
+
+    return max(14, min(72, $fontSize));
 }

@@ -78,6 +78,22 @@ CREATE TABLE IF NOT EXISTS ticker_items (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS ticker_feeds (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(255) NULL,
+    feed_url VARCHAR(1024) NOT NULL,
+    priority INT NOT NULL DEFAULT 1,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    cache_payload MEDIUMTEXT NULL,
+    cache_fetched_at DATETIME NULL,
+    cache_ttl_seconds INT NOT NULL DEFAULT 300,
+    last_error TEXT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_ticker_feed_priority (priority),
+    INDEX idx_ticker_feed_active (is_active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS media_items (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
@@ -129,5 +145,6 @@ INSERT INTO settings (`key`, `value`) VALUES
     ('time_format', '24h'),
     ('ticker_speed', '40'),
     ('ticker_font_size', '24'),
-    ('ticker_band_height', '70')
+    ('ticker_band_height', '70'),
+    ('announcement_font_size', '22')
 ON DUPLICATE KEY UPDATE `value` = VALUES(`value`);
