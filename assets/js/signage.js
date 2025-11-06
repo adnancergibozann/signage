@@ -32,6 +32,8 @@ const signageState = {
     clockTimer: null,
     countdownTimers: [],
     mediaTimer: null,
+    mediaCurrentId: null,
+    mediaExpiresAt: null,
 };
 
 const CONNECTION_LABELS = {
@@ -414,15 +416,42 @@ function renderAlerts(alerts) {
 function renderMedia(media) {
     const overlay = document.querySelector('.fullscreen-media');
     if (!overlay) return;
-    overlay.innerHTML = '';
-    if (signageState.mediaTimer) {
-        clearTimeout(signageState.mediaTimer);
-        signageState.mediaTimer = null;
-    }
+
+    const clearTimer = () => {
+        if (signageState.mediaTimer) {
+            clearTimeout(signageState.mediaTimer);
+            signageState.mediaTimer = null;
+        }
+    };
+
+    const resetState = () => {
+        clearTimer();
+        signageState.mediaCurrentId = null;
+        signageState.mediaExpiresAt = null;
+    };
+
     if (!media) {
         overlay.classList.remove('active');
+        overlay.innerHTML = '';
+        resetState();
         return;
     }
+
+    const now = Date.now();
+    const durationMs = media.durationSeconds ? media.durationSeconds * 1000 : null;
+    const mediaId = media.id ?? `${media.type}:${media.url}`;
+    const sameMediaActive = signageState.mediaCurrentId === mediaId
+        && overlay.classList.contains('active')
+        && signageState.mediaExpiresAt !== null
+        && signageState.mediaExpiresAt > now;
+
+    if (sameMediaActive) {
+        return;
+    }
+
+    overlay.innerHTML = '';
+    clearTimer();
+
     let node;
     if (media.type === 'video') {
         node = document.createElement('video');
@@ -437,8 +466,18 @@ function renderMedia(media) {
     }
     overlay.appendChild(node);
     overlay.classList.add('active');
-    if (media.durationSeconds) {
-        signageState.mediaTimer = setTimeout(() => overlay.classList.remove('active'), media.durationSeconds * 1000);
+
+    signageState.mediaCurrentId = mediaId;
+    if (durationMs) {
+        const expiresAt = now + durationMs;
+        signageState.mediaExpiresAt = expiresAt;
+        signageState.mediaTimer = setTimeout(() => {
+            overlay.classList.remove('active');
+            overlay.innerHTML = '';
+            resetState();
+        }, durationMs);
+    } else {
+        signageState.mediaExpiresAt = null;
     }
 }
 

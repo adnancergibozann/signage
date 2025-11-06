@@ -246,6 +246,7 @@ function find_active_media(PDO $pdo, DateTimeImmutable $now): ?array
     }
 
     return [
+        'id' => (int) $media['id'],
         'title' => $media['title'],
         'type' => $media['media_type'],
         'url' => asset_url('public/uploads/media/' . $media['file_path']),
