@@ -101,9 +101,15 @@ $formatMeetingTicker = static function (array $meeting) use ($formatMeetingTime)
                 <img src="<?= $logoUrl ? htmlspecialchars($logoUrl, ENT_QUOTES) : $placeholderProfile ?>" alt="Gapgross"<?= $logoUrl ? '' : ' style="display:none"' ?>>
                 <h1><?= htmlspecialchars($settings['companyName'] ?? 'Gapgross') ?></h1>
             </div>
-            <div class="clock" aria-live="polite">
-                <div class="time"><?= htmlspecialchars($timeString) ?></div>
-                <div class="date"><?= htmlspecialchars($dateString) ?></div>
+            <div class="header-meta">
+                <div class="connection-indicator" data-status="online" aria-live="polite" aria-label="Sunucu bağlantısı: bağlı">
+                    <span class="connection-dot" aria-hidden="true"></span>
+                    <span class="connection-text">Bağlı</span>
+                </div>
+                <div class="clock" aria-live="polite">
+                    <div class="time"><?= htmlspecialchars($timeString) ?></div>
+                    <div class="date"><?= htmlspecialchars($dateString) ?></div>
+                </div>
             </div>
         </section>
 

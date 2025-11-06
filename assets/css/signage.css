@@ -48,6 +48,12 @@ body {
     border: 2px solid rgba(23, 0, 122, 0.55);
 }
 
+.header-meta {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+}
+
 .branding {
     display: flex;
     align-items: center;
@@ -82,6 +88,57 @@ body {
 .clock .date {
     font-size: 1.2rem;
     color: var(--gap-muted);
+}
+
+.connection-indicator {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(255, 255, 255, 0.08);
+    padding: 8px 16px;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    letter-spacing: 0.02em;
+    transition: background 0.3s ease, color 0.3s ease;
+}
+
+.connection-indicator .connection-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    box-shadow: 0 0 12px rgba(0, 0, 0, 0.4);
+    transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+
+.connection-indicator[data-status="online"] {
+    background: rgba(38, 215, 130, 0.15);
+    color: #bff3da;
+}
+
+.connection-indicator[data-status="online"] .connection-dot {
+    background: #2dd88c;
+    box-shadow: 0 0 16px rgba(45, 216, 140, 0.7);
+}
+
+.connection-indicator[data-status="connecting"] {
+    background: rgba(255, 200, 87, 0.18);
+    color: #ffe3a1;
+}
+
+.connection-indicator[data-status="connecting"] .connection-dot {
+    background: #ffc857;
+    box-shadow: 0 0 14px rgba(255, 200, 87, 0.6);
+}
+
+.connection-indicator[data-status="offline"] {
+    background: rgba(227, 0, 11, 0.2);
+    color: #ffc7cd;
+}
+
+.connection-indicator[data-status="offline"] .connection-dot {
+    background: #ff4d61;
+    box-shadow: 0 0 16px rgba(255, 77, 97, 0.65);
 }
 
 .main-area {

@@ -34,6 +34,27 @@ const signageState = {
     mediaTimer: null,
 };
 
+const CONNECTION_LABELS = {
+    online: 'Bağlı',
+    offline: 'Bağlantı Yok',
+    connecting: 'Kontrol ediliyor',
+};
+
+function setConnectionStatus(status) {
+    const indicator = document.querySelector('.connection-indicator');
+    if (!indicator) {
+        return;
+    }
+    const normalized = CONNECTION_LABELS[status] ? status : 'offline';
+    indicator.dataset.status = normalized;
+    const label = indicator.querySelector('.connection-text');
+    const labelText = CONNECTION_LABELS[normalized];
+    if (label) {
+        label.textContent = labelText;
+    }
+    indicator.setAttribute('aria-label', `Sunucu bağlantısı: ${labelText}`);
+}
+
 function isSameDay(dateA, dateB) {
     return dateA.getFullYear() === dateB.getFullYear()
         && dateA.getMonth() === dateB.getMonth()
@@ -68,6 +89,7 @@ function formatMeetingTime(meeting, referenceDate) {
 
 async function loadSignageState() {
     try {
+        setConnectionStatus('connecting');
         const response = await fetch(withBase('/public/api/signage.php'), { cache: 'no-store' });
         if (!response.ok) {
             throw new Error('Veri alınamadı');
@@ -78,9 +100,11 @@ async function loadSignageState() {
         signageState.timeFormat = data.settings.timeFormat || '24h';
         renderSignage(data);
         scheduleRefresh();
+        setConnectionStatus('online');
     } catch (error) {
         console.error('Signage güncellenirken hata oluştu:', error);
         scheduleRefresh(10);
+        setConnectionStatus('offline');
     }
 }
 
@@ -325,20 +349,29 @@ function renderTicker(items, settings) {
     }
     const root = document.documentElement;
     const fontSize = settings?.tickerFontSize;
-    const bandHeight = settings?.tickerHeight;
-    if (fontSize && Number.isFinite(fontSize)) {
-        root.style.setProperty('--ticker-font-size', `${fontSize}px`);
+    const fontSizeValue = fontSize === null || fontSize === undefined ? NaN : Number.parseFloat(fontSize);
+    if (Number.isFinite(fontSizeValue) && fontSizeValue > 0) {
+        root.style.setProperty('--ticker-font-size', `${fontSizeValue}px`);
     } else {
         root.style.removeProperty('--ticker-font-size');
     }
-    if (bandHeight && Number.isFinite(bandHeight)) {
-        root.style.setProperty('--ticker-height', `${bandHeight}px`);
+    const bandHeight = settings?.tickerHeight;
+    const bandHeightValue = bandHeight === null || bandHeight === undefined ? NaN : Number.parseFloat(bandHeight);
+    if (Number.isFinite(bandHeightValue) && bandHeightValue > 0) {
+        root.style.setProperty('--ticker-height', `${bandHeightValue}px`);
     } else {
         root.style.removeProperty('--ticker-height');
     }
+    const tickerSpeedValue = settings?.tickerSpeed === null || settings?.tickerSpeed === undefined
+        ? NaN
+        : Number.parseFloat(settings.tickerSpeed);
+    if (Number.isFinite(tickerSpeedValue) && tickerSpeedValue > 0) {
+        root.style.setProperty('--ticker-speed', `${tickerSpeedValue}s`);
+    } else {
+        root.style.removeProperty('--ticker-speed');
+    }
     track.innerHTML = '';
-    const speed = settings?.tickerSpeed ? `${settings.tickerSpeed}s` : '35s';
-    track.style.setProperty('animation-duration', speed);
+    track.style.removeProperty('animation-duration');
     if (!items || items.length === 0) {
         const placeholder = document.createElement('div');
         placeholder.className = 'ticker-item';
