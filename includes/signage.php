@@ -1,320 +1,308 @@
 <?php
+declare(strict_types=1);
 
-require_once __DIR__ . '/../config/database.php';
-require_once __DIR__ . '/messages.php';
+require_once __DIR__ . '/status.php';
+require_once __DIR__ . '/meetings.php';
+require_once __DIR__ . '/ticker.php';
 
-function get_signage_data(): array
+function format_signage_meeting(array $meeting, DateTimeImmutable $now): array
 {
-    $settings = get_signage_settings();
-    $ticker = fetch_messages();
-    $teachers = fetch_on_duty_teachers();
-    $weather = fetch_latest_weather();
-    $media = fetch_active_media_items();
-    $periods = fetch_schedule_periods();
-    $schedule = fetch_weekly_schedule();
-    $news = fetch_latest_news();
-    $countdowns = fetch_active_countdowns();
-    $nextPeriod = compute_next_period_state($periods);
+    $status = $meeting['status'] ?? 'planned';
+    $statusLabel = $meeting['statusLabel'] ?? meeting_status_label($status);
+    $position = $meeting['position'] ?? null;
+    $positionLabel = $meeting['positionLabel'] ?? match ($position) {
+        'current' => 'Aktif Görüşme',
+        'next' => 'Sıradaki Görüşme',
+        default => $statusLabel,
+    };
 
-    return [
-        'settings' => $settings,
-        'ticker' => $ticker,
-        'teachers' => $teachers,
-        'weather' => $weather,
-        'media' => $media,
-        'periods' => $periods,
-        'schedule' => $schedule,
-        'news' => $news,
-        'countdowns' => $countdowns,
-        'nextPeriod' => $nextPeriod,
-    ];
-}
+    $scheduledStart = $meeting['scheduledStart'] ?? $meeting['scheduled_start'] ?? null;
+    $scheduledEnd = $meeting['scheduledEnd'] ?? $meeting['scheduled_end'] ?? null;
 
-function get_signage_settings(): array
-{
-    $pdo = get_pdo();
-    $stmt = $pdo->query('SELECT organization_name, logo, logo_mime FROM signage_settings WHERE id = 1 LIMIT 1');
-    $row = $stmt->fetch();
+    $startIso = null;
+    $endIso = null;
+    $startsInSeconds = null;
+    $isToday = null;
 
-    if (!$row) {
-        return [
-            'organization_name' => 'Okulumuz',
-            'logo_data_url' => null,
+    if ($scheduledStart) {
+        try {
+            $start = new DateTimeImmutable((string) $scheduledStart);
+            $startIso = $start->format(DateTimeInterface::ATOM);
+            $startsInSeconds = $start->getTimestamp() - $now->getTimestamp();
+            $isToday = $start->format('Y-m-d') === $now->format('Y-m-d');
+        } catch (Throwable) {
+            $startIso = $scheduledStart;
+        }
+    }
+
+    if ($scheduledEnd) {
+        try {
+            $end = new DateTimeImmutable((string) $scheduledEnd);
+            $endIso = $end->format(DateTimeInterface::ATOM);
+        } catch (Throwable) {
+            $endIso = $scheduledEnd;
+        }
+    }
+
+    $manager = null;
+    if (isset($meeting['managerId']) || isset($meeting['managerName'])) {
+        $manager = [
+            'id' => isset($meeting['managerId']) ? (int) $meeting['managerId'] : null,
+            'name' => $meeting['managerName'] ?? null,
+            'department' => $meeting['managerDepartment'] ?? null,
+            'role' => $meeting['managerRole'] ?? null,
         ];
     }
 
     return [
-        'organization_name' => $row['organization_name'],
-        'logo_data_url' => build_data_url($row['logo'], $row['logo_mime']),
+        'id' => isset($meeting['id']) ? (int) $meeting['id'] : null,
+        'status' => $status,
+        'statusLabel' => $statusLabel,
+        'position' => $position,
+        'positionLabel' => $positionLabel,
+        'visitorName' => $meeting['visitorName'] ?? null,
+        'visitorCompany' => $meeting['visitorCompany'] ?? null,
+        'purpose' => $meeting['purpose'] ?? null,
+        'notes' => $meeting['notes'] ?? null,
+        'scheduledStart' => $scheduledStart,
+        'scheduledStartIso' => $startIso,
+        'scheduledEnd' => $scheduledEnd,
+        'scheduledEndIso' => $endIso,
+        'startsInSeconds' => $startsInSeconds !== null ? (int) $startsInSeconds : null,
+        'isToday' => $isToday,
+        'manager' => $manager,
     ];
 }
 
-function fetch_on_duty_teachers(): array
+function fetch_signage_state(): array
 {
     $pdo = get_pdo();
-    $stmt = $pdo->query('SELECT first_name, last_name, branch, photo, photo_mime FROM teachers WHERE is_on_duty = 1 ORDER BY position ASC, last_name ASC');
-    $teachers = [];
-    foreach ($stmt->fetchAll() as $teacher) {
-        $teachers[] = [
-            'name' => trim($teacher['first_name'] . ' ' . $teacher['last_name']),
-            'branch' => $teacher['branch'],
-            'photo' => build_data_url($teacher['photo'], $teacher['photo_mime']),
+    $now = new DateTimeImmutable('now');
+
+    $settings = load_all_settings();
+    $companyName = $settings['company_name'] ?? 'Gapgross';
+    $logoPath = $settings['logo_path'] ?? null;
+    $organigramPath = $settings['organigram_path'] ?? null;
+    $refresh = (int)($settings['signage_refresh_seconds'] ?? config_value('signage.refresh_seconds', 5));
+    $timeFormat = $settings['time_format'] ?? config_value('signage.time_format', '24h');
+    $primary = $settings['theme_primary'] ?? config_value('theme.primary');
+    $secondary = $settings['theme_secondary'] ?? config_value('theme.secondary');
+    $tickerSpeed = (int)($settings['ticker_speed'] ?? 40);
+    $tickerFontSize = (int)($settings['ticker_font_size'] ?? 24);
+    $tickerBandHeight = (int)($settings['ticker_band_height'] ?? 70);
+    if ($tickerFontSize <= 0) {
+        $tickerFontSize = 24;
+    }
+    if ($tickerBandHeight <= 0) {
+        $tickerBandHeight = 70;
+    }
+    $announcementFontSize = (int)($settings['announcement_font_size'] ?? 22);
+    if ($announcementFontSize <= 0) {
+        $announcementFontSize = 22;
+    }
+
+    $managers = fetch_managers_with_status($pdo, $now, $settings);
+    $upcomingMeeting = fetch_next_global_meeting($pdo, $now);
+    $nextMeeting = $upcomingMeeting ? format_signage_meeting($upcomingMeeting, $now) : null;
+    $announcements = fetch_active_announcements($pdo, $now);
+    $tickers = fetch_active_tickers($pdo, $now);
+    $feedTickers = fetch_active_ticker_feed_items($pdo, $now);
+    if ($feedTickers) {
+        $tickers = array_values(array_unique(array_merge($tickers, $feedTickers)));
+    }
+    $media = find_active_media($pdo, $now);
+    $alerts = build_alerts($settings, $now);
+
+    return [
+        'timestamp' => $now->format(DateTimeInterface::ATOM),
+        'settings' => [
+            'companyName' => $companyName,
+            'refreshSeconds' => $refresh,
+            'timeFormat' => $timeFormat,
+            'primaryColor' => $primary,
+            'secondaryColor' => $secondary,
+            'tickerSpeed' => $tickerSpeed,
+            'tickerFontSize' => $tickerFontSize,
+            'tickerHeight' => $tickerBandHeight,
+            'announcementFontSize' => $announcementFontSize,
+            'logoUrl' => $logoPath ? asset_url('public/uploads/branding/' . $logoPath) : null,
+            'organigramUrl' => $organigramPath ? asset_url('public/uploads/branding/' . $organigramPath) : null,
+        ],
+        'managers' => $managers,
+        'nextMeeting' => $nextMeeting,
+        'announcements' => $announcements,
+        'ticker' => $tickers,
+        'activeMedia' => $media,
+        'alerts' => $alerts,
+    ];
+}
+
+function fetch_managers_with_status(PDO $pdo, DateTimeImmutable $now, array $settings = []): array
+{
+    $managerRoles = manager_role_keys();
+    $placeholders = implode(',', array_fill(0, count($managerRoles), '?'));
+    $stmt = $pdo->prepare("SELECT u.id, u.full_name, u.department, u.photo_path, u.role, s.status, s.state_started_at, s.state_ends_at, s.note, s.display_order
+        FROM users u
+        LEFT JOIN manager_statuses s ON s.user_id = u.id
+        WHERE u.role IN ($placeholders)
+        ORDER BY (s.display_order IS NULL) ASC, s.display_order ASC, u.full_name ASC");
+    $stmt->execute($managerRoles);
+    $rows = $stmt->fetchAll();
+
+    $managerIds = array_map(static fn (array $row): int => (int) $row['id'], $rows);
+    $nextMeetings = fetch_next_meetings_for_managers($pdo, $managerIds, $now);
+    $managers = [];
+    $lunchWindow = current_lunch_window($settings, $now);
+    $lunchEndsAt = $lunchWindow ? $lunchWindow['end']->format('Y-m-d H:i:s') : null;
+    $lunchStartsAt = $lunchWindow ? $lunchWindow['start']->format('Y-m-d H:i:s') : null;
+    $lunchRemaining = $lunchWindow ? max(0, $lunchWindow['end']->getTimestamp() - $now->getTimestamp()) : null;
+    foreach ($rows as $row) {
+        $status = $row['status'] ?? 'available';
+        $endsAt = $row['state_ends_at'];
+        $remainingSeconds = null;
+        $startedAt = $row['state_started_at'];
+        if ($lunchWindow) {
+            $status = 'lunch';
+            $endsAt = $lunchEndsAt;
+            $remainingSeconds = $lunchRemaining;
+            $startedAt = $lunchStartsAt;
+        } elseif ($endsAt) {
+            $diff = (new DateTimeImmutable($endsAt))->getTimestamp() - $now->getTimestamp();
+            $remainingSeconds = $diff > 0 ? $diff : 0;
+        }
+
+        $managerId = (int) $row['id'];
+        $meetingSet = $nextMeetings[$managerId] ?? ['current' => null, 'next' => null];
+        $currentMeeting = $meetingSet['current'] ?? null;
+        $nextMeeting = $meetingSet['next'] ?? null;
+        if ($currentMeeting) {
+            $currentMeeting['position'] = $currentMeeting['position'] ?? 'current';
+        }
+        if ($nextMeeting) {
+            $nextMeeting['position'] = $nextMeeting['position'] ?? 'next';
+        }
+        $currentMeetingData = $currentMeeting ? format_signage_meeting($currentMeeting, $now) : null;
+        $nextMeetingData = $nextMeeting ? format_signage_meeting($nextMeeting, $now) : null;
+
+        $managers[] = [
+            'id' => $managerId,
+            'name' => $row['full_name'],
+            'department' => $row['department'],
+            'role' => $row['role'],
+            'displayOrder' => $row['display_order'] !== null ? (int) $row['display_order'] : null,
+            'status' => $status,
+            'statusLabel' => map_status_label($status),
+            'photoUrl' => $row['photo_path'] ? asset_url('public/uploads/profile/' . $row['photo_path']) : null,
+            'note' => $row['note'],
+            'remainingSeconds' => $remainingSeconds,
+            'endsAt' => $endsAt,
+            'startedAt' => $startedAt,
+            'currentMeeting' => $currentMeetingData,
+            'nextMeeting' => $nextMeetingData,
         ];
     }
 
-    return $teachers;
+    return $managers;
 }
 
-function fetch_latest_weather(): ?array
+function fetch_active_announcements(PDO $pdo, DateTimeImmutable $now): array
 {
-    $pdo = get_pdo();
-    $stmt = $pdo->prepare('SELECT city, temperature, feels_like, humidity, wind_speed, condition_label, condition_icon, fetched_at FROM weather_snapshots WHERE is_active = 1 ORDER BY fetched_at DESC LIMIT 1');
-    $stmt->execute();
-    $row = $stmt->fetch();
+    $stmt = $pdo->prepare('SELECT id, title, body, priority
+        FROM announcements
+        WHERE is_active = 1
+            AND (starts_at IS NULL OR starts_at <= :now)
+            AND (ends_at IS NULL OR ends_at >= :now)
+        ORDER BY priority DESC, starts_at DESC, id DESC');
+    $stmt->execute(['now' => $now->format('Y-m-d H:i:s')]);
 
-    if (!$row) {
+    return $stmt->fetchAll();
+}
+
+function fetch_active_tickers(PDO $pdo, DateTimeImmutable $now): array
+{
+    $stmt = $pdo->prepare('SELECT message
+        FROM ticker_items
+        WHERE is_active = 1
+            AND (starts_at IS NULL OR starts_at <= :now)
+            AND (ends_at IS NULL OR ends_at >= :now)
+        ORDER BY priority DESC, id DESC');
+    $stmt->execute(['now' => $now->format('Y-m-d H:i:s')]);
+    return array_column($stmt->fetchAll(), 'message');
+}
+
+function find_active_media(PDO $pdo, DateTimeImmutable $now): ?array
+{
+    $stmt = $pdo->prepare('SELECT id, title, file_path, media_type, duration_seconds
+        FROM media_items
+        WHERE is_active = 1
+            AND is_fullscreen = 1
+            AND (starts_at IS NULL OR starts_at <= :now)
+            AND (ends_at IS NULL OR ends_at >= :now)
+        ORDER BY priority DESC, starts_at DESC, id DESC
+        LIMIT 1');
+    $stmt->execute(['now' => $now->format('Y-m-d H:i:s')]);
+    $media = $stmt->fetch();
+    if (!$media) {
         return null;
     }
 
     return [
-        'city' => $row['city'],
-        'temperature' => (float) $row['temperature'],
-        'feels_like' => $row['feels_like'] !== null ? (float) $row['feels_like'] : null,
-        'humidity' => $row['humidity'] !== null ? (int) $row['humidity'] : null,
-        'wind_speed' => $row['wind_speed'] !== null ? (float) $row['wind_speed'] : null,
-        'condition' => $row['condition_label'],
-        'icon' => $row['condition_icon'],
-        'fetched_at' => $row['fetched_at'],
+        'id' => (int) $media['id'],
+        'title' => $media['title'],
+        'type' => $media['media_type'],
+        'url' => asset_url('public/uploads/media/' . $media['file_path']),
+        'durationSeconds' => $media['duration_seconds'] ? (int) $media['duration_seconds'] : null,
     ];
 }
 
-function fetch_active_media_items(): array
+function build_alerts(array $settings, DateTimeImmutable $now): array
 {
-    $pdo = get_pdo();
-    $stmt = $pdo->query('SELECT title, type, source, duration_seconds FROM media_items WHERE is_active = 1 ORDER BY position ASC, id ASC');
-    $items = [];
-    foreach ($stmt->fetchAll() as $item) {
-        $items[] = [
-            'title' => $item['title'],
-            'type' => $item['type'],
-            'source' => $item['source'],
-            'duration' => max(3, (int) $item['duration_seconds']),
+    $alerts = [];
+    if (current_lunch_window($settings, $now)) {
+        $alerts[] = [
+            'type' => 'lunch',
+            'message' => 'Belirlenen yemek molası saatindeyiz.',
         ];
     }
-
-    return $items;
+    return $alerts;
 }
 
-function fetch_schedule_periods(): array
+function current_lunch_window(array $settings, DateTimeImmutable $now): ?array
 {
-    $pdo = get_pdo();
-    $stmt = $pdo->query('SELECT period_number, label, start_time, end_time FROM schedule_periods ORDER BY period_number ASC');
-    $periods = [];
-    foreach ($stmt->fetchAll() as $row) {
-        $periods[] = [
-            'period' => (int) $row['period_number'],
-            'label' => $row['label'],
-            'start_time' => $row['start_time'],
-            'end_time' => $row['end_time'],
-        ];
-    }
-
-    return $periods;
-}
-
-function fetch_weekly_schedule(): array
-{
-    $pdo = get_pdo();
-    $stmt = $pdo->query('SELECT c.id, c.name, c.display_order FROM classrooms c ORDER BY c.display_order ASC, c.name ASC');
-    $classrooms = $stmt->fetchAll();
-
-    if (!$classrooms) {
-        return [];
-    }
-
-    $scheduleStmt = $pdo->prepare('SELECT weekday, period_number, subject, teacher FROM class_schedule_entries WHERE classroom_id = :classroom_id');
-
-    $schedule = [];
-    foreach ($classrooms as $classroom) {
-        $scheduleStmt->execute(['classroom_id' => $classroom['id']]);
-        $entries = $scheduleStmt->fetchAll();
-
-        $grid = [];
-        foreach ($entries as $entry) {
-            $weekday = (int) $entry['weekday'];
-            $period = (int) $entry['period_number'];
-            $grid[$weekday][$period] = [
-                'subject' => $entry['subject'],
-                'teacher' => $entry['teacher'],
-            ];
-        }
-
-        $schedule[] = [
-            'classroom' => $classroom['name'],
-            'entries' => $grid,
-        ];
-    }
-
-    return $schedule;
-}
-
-function fetch_latest_news(): array
-{
-    $pdo = get_pdo();
-    $stmt = $pdo->query('SELECT title, summary, image_url, source_url, published_at FROM news_items WHERE is_active = 1 ORDER BY COALESCE(published_at, created_at) DESC LIMIT 10');
-    $items = [];
-    foreach ($stmt->fetchAll() as $row) {
-        $items[] = [
-            'title' => $row['title'],
-            'summary' => $row['summary'],
-            'image_url' => $row['image_url'],
-            'source_url' => $row['source_url'],
-            'published_at' => $row['published_at'],
-        ];
-    }
-
-    return $items;
-}
-
-function fetch_active_countdowns(): array
-{
-    $pdo = get_pdo();
-    $stmt = $pdo->prepare('SELECT title, target_at, icon, highlight_color FROM countdowns WHERE is_active = 1 AND target_at >= :now ORDER BY target_at ASC');
-    $stmt->execute(['now' => (new \DateTimeImmutable('now'))->format('Y-m-d H:i:s')]);
-    $items = [];
-    foreach ($stmt->fetchAll() as $row) {
-        $items[] = [
-            'title' => $row['title'],
-            'target_at' => $row['target_at'],
-            'icon' => $row['icon'],
-            'color' => $row['highlight_color'],
-        ];
-    }
-
-    return $items;
-}
-
-function compute_next_period_state(array $periods): array
-{
-    if (!$periods) {
-        return [
-            'state' => 'unconfigured',
-            'label' => 'Ders saatleri tanımlanmadı',
-        ];
-    }
-
-    $timezone = new \DateTimeZone(date_default_timezone_get() ?: 'Europe/Istanbul');
-    $now = new \DateTimeImmutable('now', $timezone);
-
-    $dayOfWeek = (int) $now->format('N');
-    if ($dayOfWeek >= 6) {
-        return [
-            'state' => 'after-school',
-            'label' => 'Hafta Sonu',
-            'message' => 'Okulumuz tatilde',
-        ];
-    }
-
-    $sorted = $periods;
-    usort($sorted, static function ($a, $b) {
-        return strcmp($a['start_time'], $b['start_time']);
-    });
-
-    $firstStart = new \DateTimeImmutable($sorted[0]['start_time'], $timezone);
-    $lastEnd = new \DateTimeImmutable($sorted[count($sorted) - 1]['end_time'], $timezone);
-
-    $firstStart = $now->setTime((int) $firstStart->format('H'), (int) $firstStart->format('i'));
-    $lastEnd = $now->setTime((int) $lastEnd->format('H'), (int) $lastEnd->format('i'));
-
-    if ($now < $firstStart) {
-        return [
-            'state' => 'before-school',
-            'label' => 'Okulumuz Açılıyor',
-            'timeLeft' => diff_to_array($now->diff($firstStart)),
-            'next_change_at' => $firstStart->format(\DateTimeInterface::ATOM),
-            'next_period' => [
-                'label' => $sorted[0]['label'],
-                'starts_at' => $sorted[0]['start_time'],
-            ],
-        ];
-    }
-
-    if ($now >= $lastEnd) {
-        return [
-            'state' => 'after-school',
-            'label' => 'Okulumuz Kapandı',
-            'message' => 'Yarın görüşmek üzere',
-        ];
-    }
-
-    foreach ($sorted as $index => $period) {
-        $start = to_datetime($period['start_time'], $timezone, $now);
-        $end = to_datetime($period['end_time'], $timezone, $now);
-
-        if ($now >= $start && $now < $end) {
-            $next = $sorted[$index + 1] ?? null;
-            return [
-                'state' => 'lesson',
-                'label' => $period['label'],
-                'timeLeft' => diff_to_array($now->diff($end)),
-                'next_change_at' => $end->format(\DateTimeInterface::ATOM),
-                'next_period' => $next ? [
-                    'label' => $next['label'],
-                    'starts_at' => $next['start_time'],
-                ] : null,
-            ];
-        }
-
-        if ($now >= $end) {
-            $next = $sorted[$index + 1] ?? null;
-            if ($next) {
-                $nextStart = to_datetime($next['start_time'], $timezone, $now);
-                if ($now < $nextStart) {
-                    return [
-                        'state' => 'break',
-                        'label' => 'Teneffüs',
-                        'timeLeft' => diff_to_array($now->diff($nextStart)),
-                        'next_change_at' => $nextStart->format(\DateTimeInterface::ATOM),
-                        'next_period' => [
-                            'label' => $next['label'],
-                            'starts_at' => $next['start_time'],
-                        ],
-                    ];
-                }
-            }
-        }
-    }
-
-    return [
-        'state' => 'after-school',
-        'label' => 'Okulumuz Kapandı',
-        'message' => 'Yarın görüşmek üzere',
-    ];
-}
-
-function to_datetime(string $time, \DateTimeZone $tz, \DateTimeImmutable $reference): \DateTimeImmutable
-{
-    [$hour, $minute] = array_map('intval', explode(':', substr($time, 0, 5)));
-    return $reference->setTime($hour, $minute);
-}
-
-function diff_to_array(\DateInterval $interval): array
-{
-    $minutes = ($interval->days * 24 * 60) + ($interval->h * 60) + $interval->i;
-    return [
-        'minutes' => max(0, $minutes),
-        'seconds' => max(0, $interval->s),
-    ];
-}
-
-function build_data_url($binary, ?string $mime): ?string
-{
-    if (!$binary) {
+    $startTime = extract_time_component($settings['lunch_notice_start'] ?? null);
+    $endTime = extract_time_component($settings['lunch_notice_end'] ?? null);
+    if (!$startTime || !$endTime) {
         return null;
     }
 
-    $encoded = base64_encode($binary);
-    $mime = $mime ?: 'image/png';
+    [$startHour, $startMinute] = array_map('intval', explode(':', $startTime));
+    [$endHour, $endMinute] = array_map('intval', explode(':', $endTime));
 
-    return sprintf('data:%s;base64,%s', $mime, $encoded);
+    $tz = $now->getTimezone();
+    $baseDate = $now->format('Y-m-d');
+    $start = DateTimeImmutable::createFromFormat('Y-m-d H:i', sprintf('%s %02d:%02d', $baseDate, $startHour, $startMinute), $tz);
+    $end = DateTimeImmutable::createFromFormat('Y-m-d H:i', sprintf('%s %02d:%02d', $baseDate, $endHour, $endMinute), $tz);
+    if (!$start || !$end) {
+        return null;
+    }
+
+    if ($end <= $start) {
+        $end = $end->modify('+1 day');
+        if ($now < $start) {
+            $start = $start->modify('-1 day');
+            $end = $end->modify('-1 day');
+        }
+    }
+
+    if ($now < $start) {
+        return null;
+    }
+    if ($now > $end) {
+        return null;
+    }
+
+    return [
+        'start' => $start,
+        'end' => $end,
+    ];
 }

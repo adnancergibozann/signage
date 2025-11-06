@@ -1,43 +1,98 @@
 <?php
-require_once __DIR__ . '/../includes/auth.php';
+declare(strict_types=1);
 
-$error = null;
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = trim($_POST['username'] ?? '');
-    $password = trim($_POST['password'] ?? '');
+require __DIR__ . '/../includes/bootstrap.php';
 
-    if (attempt_login($username, $password)) {
-        header('Location: /admin/dashboard.php');
-        exit;
-    }
-
-    $error = 'Kullanıcı adı veya şifre hatalı.';
+if (current_user()) {
+    header('Location: ' . default_dashboard_route(current_user()['role']));
+    exit;
 }
 
+$error = null;
+$logoPath = get_setting('logo_path');
+$logoUrl = $logoPath ? asset_url('public/uploads/branding/' . $logoPath) : null;
+$companyName = get_setting('company_name', 'Gapgross');
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $username = trim($_POST['username'] ?? '');
+    $password = $_POST['password'] ?? '';
+    if ($username === '' || $password === '') {
+        $error = 'Kullanıcı adı ve şifre zorunludur.';
+    } elseif (attempt_login($username, $password)) {
+        $user = current_user();
+        header('Location: ' . default_dashboard_route($user['role']));
+        exit;
+    } else {
+        $error = 'Geçersiz kullanıcı adı veya şifre.';
+    }
+}
+
+function default_dashboard_route(string $role): string
+{
+    return match ($role) {
+        'manager', 'finance', 'accounting' => url_for('admin/manager.php'),
+        'boss' => url_for('admin/dashboard.php'),
+        'super_admin' => url_for('admin/dashboard.php'),
+        'secretary' => url_for('admin/secretary.php'),
+        default => url_for('index.php'),
+    };
+}
 ?>
 <!DOCTYPE html>
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
+    <title>Gapgross Yönetim Girişi</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Yönetim Girişi | Signage</title>
-    <link rel="stylesheet" href="/assets/styles.css">
+    <link rel="stylesheet" href="<?= asset_url('assets/css/admin.css?v=1') ?>">
+    <style>
+        body { display: flex; justify-content: center; align-items: center; }
+        .login-card {
+            background: rgba(15, 21, 45, 0.9);
+            border-radius: 20px;
+            padding: 36px;
+            width: min(420px, 90%);
+            box-shadow: 0 24px 48px rgba(0, 0, 0, 0.35);
+        }
+        .login-logo {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 24px;
+        }
+        .login-logo img {
+            max-width: 220px;
+            max-height: 120px;
+            object-fit: contain;
+        }
+        .login-card h1 {
+            margin-top: 0;
+        }
+        .login-card form { display: flex; flex-direction: column; gap: 16px; }
+        .login-card button { align-self: stretch; }
+    </style>
 </head>
-<body class="auth-body">
-    <main class="auth-container">
-        <h1>Panel Girişi</h1>
-        <?php if ($error): ?>
-            <div class="alert alert-error"><?php echo htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?></div>
+<body>
+    <div class="login-card">
+        <?php if ($logoUrl): ?>
+            <div class="login-logo">
+                <img src="<?= htmlspecialchars($logoUrl, ENT_QUOTES) ?>" alt="<?= htmlspecialchars($companyName) ?> logosu">
+            </div>
         <?php endif; ?>
-        <form method="post" class="card">
-            <label for="username">Kullanıcı Adı</label>
-            <input type="text" id="username" name="username" required autofocus>
-
-            <label for="password">Şifre</label>
-            <input type="password" id="password" name="password" required>
-
-            <button type="submit" class="button button-primary">Giriş Yap</button>
+        <h1><?= htmlspecialchars($companyName) ?> Yönetim</h1>
+        <?php if ($error): ?>
+            <div class="alert error"><?= htmlspecialchars($error) ?></div>
+        <?php endif; ?>
+        <form method="post" autocomplete="off">
+            <div>
+                <label for="username">Kullanıcı adı</label>
+                <input type="text" id="username" name="username" required>
+            </div>
+            <div>
+                <label for="password">Şifre</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <button class="button" type="submit">Giriş Yap</button>
         </form>
-    </main>
+    </div>
 </body>
 </html>

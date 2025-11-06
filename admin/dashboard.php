@@ -1,187 +1,97 @@
 <?php
-require_once __DIR__ . '/../includes/auth.php';
-require_once __DIR__ . '/../includes/messages.php';
+declare(strict_types=1);
+
+require __DIR__ . '/../includes/bootstrap.php';
+require __DIR__ . '/../includes/signage.php';
 
 require_login();
-$activePage = 'ticker';
-
-$allowed_colors = [
-    '#FFD400' => 'Sarı',
-    '#0A0A0A' => 'Siyah',
-    '#FFFFFF' => 'Beyaz',
-];
-
-$errors = [];
-$flash = $_SESSION['flash'] ?? null;
-unset($_SESSION['flash']);
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['action']) && $_POST['action'] === 'create') {
-        $title = trim($_POST['title'] ?? '');
-        $body = trim($_POST['body'] ?? '');
-        $text_color = $_POST['text_color'] ?? '#FFFFFF';
-        $background_color = $_POST['background_color'] ?? '#0A0A0A';
-        $speed = (int) ($_POST['speed'] ?? 30);
-
-        if ($title === '') {
-            $errors[] = 'Başlık alanı zorunludur.';
-        }
-
-        if (!array_key_exists($text_color, $allowed_colors)) {
-            $errors[] = 'Yazı rengi geçerli değil.';
-        }
-
-        if (!array_key_exists($background_color, $allowed_colors)) {
-            $errors[] = 'Arka plan rengi geçerli değil.';
-        }
-
-        $speed = max(5, min(60, $speed));
-
-        if (!$errors) {
-            create_message([
-                'title' => $title,
-                'body' => $body,
-                'text_color' => $text_color,
-                'background_color' => $background_color,
-                'speed' => $speed,
-            ]);
-
-            $_SESSION['flash'] = 'Kayan yazı başarıyla eklendi.';
-            header('Location: /admin/dashboard.php');
-            exit;
-        }
-    }
-
-    if (isset($_POST['action']) && $_POST['action'] === 'delete') {
-        $id = (int) ($_POST['id'] ?? 0);
-        if ($id) {
-            delete_message($id);
-            $_SESSION['flash'] = 'Mesaj silindi.';
-            header('Location: /admin/dashboard.php');
-            exit;
-        }
-    }
+$user = current_user();
+if (is_manager_role($user['role'])) {
+    header('Location: ' . url_for('admin/manager.php'));
+    exit;
 }
 
-$messages = fetch_messages();
-$user = current_user();
+require_role(['super_admin', 'boss']);
+
+$pageTitle = 'Gösterge Paneli';
+$activePage = 'dashboard';
+$pdo = get_pdo();
+$now = new DateTimeImmutable();
+$settings = load_all_settings();
+$managers = fetch_managers_with_status($pdo, $now, $settings);
+
+$meetingStmt = $pdo->prepare('SELECT ml.id, u.full_name, ml.started_at, ml.expected_end_at, ml.ended_at, ml.note
+    FROM meeting_logs ml
+    INNER JOIN users u ON u.id = ml.manager_id
+    WHERE DATE(ml.started_at) = :today
+    ORDER BY ml.started_at DESC');
+$meetingStmt->execute(['today' => $now->format('Y-m-d')]);
+$meetingsToday = $meetingStmt->fetchAll();
+
+include __DIR__ . '/partials/header.php';
 ?>
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Yönetim Paneli | Signage</title>
-    <link rel="stylesheet" href="/assets/styles.css">
-</head>
-<body>
-    <div class="admin-layout">
-        <?php include __DIR__ . '/partials/sidebar.php'; ?>
-        <main class="content">
-            <header class="flex" style="justify-content: space-between; margin-bottom: 2rem;">
-                <div>
-                    <h1 style="color: var(--color-primary);">Kayan Yazılar</h1>
-                    <p>Yeni mesajlar ekleyebilir, mevcut içerikleri yönetebilirsin.</p>
-                </div>
-            </header>
+<section class="card">
+    <h3>Satınalma Müdür Durumları</h3>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Ad</th>
+                <th>Departman</th>
+                <th>Durum</th>
+                <th>Not</th>
+                <th>Geri Sayım</th>
+            </tr>
+        </thead>
+        <tbody>
+        <?php foreach ($managers as $manager): ?>
+            <tr>
+                <td><?= htmlspecialchars($manager['name']) ?></td>
+                <td><?= htmlspecialchars($manager['department'] ?? '') ?></td>
+                <td><span class="badge"><?= htmlspecialchars($manager['statusLabel']) ?></span></td>
+                <td><?= htmlspecialchars($manager['note'] ?? '') ?></td>
+                <td>
+                    <?php if ($manager['remainingSeconds'] !== null): ?>
+                        <?= format_duration((int) $manager['remainingSeconds']) ?>
+                    <?php elseif ($manager['endsAt']): ?>
+                        <?= format_datetime($manager['endsAt'], 'd.m H:i') ?>
+                    <?php else: ?>
+                        -
+                    <?php endif; ?>
+                </td>
+            </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+</section>
 
-            <?php if ($errors): ?>
-                <div class="alert alert-error">
-                    <ul>
-                        <?php foreach ($errors as $error): ?>
-                            <li><?php echo htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?></li>
-                        <?php endforeach; ?>
-                    </ul>
-                </div>
-            <?php endif; ?>
-
-            <?php if ($flash): ?>
-                <div class="alert" style="background: rgba(255, 212, 0, 0.15); border: 1px solid rgba(255, 212, 0, 0.5);">
-                    <?php echo htmlspecialchars($flash, ENT_QUOTES, 'UTF-8'); ?>
-                </div>
-            <?php endif; ?>
-
-            <section class="card" style="margin-bottom: 2rem;">
-                <h2>Yeni Kayan Yazı</h2>
-                <form method="post" class="form-grid">
-                    <input type="hidden" name="action" value="create">
-                    <div>
-                        <label for="title">Başlık</label>
-                        <input type="text" id="title" name="title" required>
-                    </div>
-                    <div>
-                        <label for="body">Detay</label>
-                        <textarea id="body" name="body" placeholder="İsteğe bağlı açıklama..."></textarea>
-                    </div>
-                    <div>
-                        <label for="text_color">Yazı Rengi</label>
-                        <select id="text_color" name="text_color">
-                            <?php foreach ($allowed_colors as $hex => $label): ?>
-                                <option value="<?php echo $hex; ?>"><?php echo $label; ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div>
-                        <label for="background_color">Arka Plan Rengi</label>
-                        <select id="background_color" name="background_color">
-                            <?php foreach ($allowed_colors as $hex => $label): ?>
-                                <option value="<?php echo $hex; ?>" <?php echo $hex === '#0A0A0A' ? 'selected' : ''; ?>><?php echo $label; ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div>
-                        <label for="speed">Kayma Süresi (saniye)</label>
-                        <input type="number" id="speed" name="speed" min="5" max="60" value="30">
-                    </div>
-                    <div style="align-self: end;">
-                        <button type="submit" class="button button-primary" style="width: 100%;">Kaydet</button>
-                    </div>
-                </form>
-            </section>
-
-            <section class="card">
-                <h2>Kayıtlı Mesajlar</h2>
-                <?php if (!$messages): ?>
-                    <p>Henüz mesaj eklenmedi.</p>
-                <?php else: ?>
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>Başlık</th>
-                                <th>Açıklama</th>
-                                <th>Renkler</th>
-                                <th>Hız</th>
-                                <th>İşlem</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($messages as $message): ?>
-                                <tr>
-                                    <td><?php echo (int) $message['id']; ?></td>
-                                    <td><?php echo htmlspecialchars($message['title'], ENT_QUOTES, 'UTF-8'); ?></td>
-                                    <td><?php echo htmlspecialchars($message['body'], ENT_QUOTES, 'UTF-8'); ?></td>
-                                    <td>
-                                        <span class="tag-preview">
-                                            <span style="width:14px;height:14px;border-radius:50%;background: <?php echo $message['background_color']; ?>;"></span>
-                                            <span style="width:14px;height:14px;border-radius:50%;background: <?php echo $message['text_color']; ?>;"></span>
-                                        </span>
-                                    </td>
-                                    <td><span class="badge"><?php echo (int) $message['speed']; ?>s</span></td>
-                                    <td>
-                                        <form method="post" onsubmit="return confirm('Bu mesaj silinsin mi?');">
-                                            <input type="hidden" name="action" value="delete">
-                                            <input type="hidden" name="id" value="<?php echo (int) $message['id']; ?>">
-                                            <button type="submit" class="button button-secondary">Sil</button>
-                                        </form>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                <?php endif; ?>
-            </section>
-        </main>
-    </div>
-</body>
-</html>
+<section class="card">
+    <h3>Bugünkü Toplantılar</h3>
+    <?php if (empty($meetingsToday)): ?>
+        <p>Bugün kayıtlı toplantı bulunmuyor.</p>
+    <?php else: ?>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Satınalma Müdürü</th>
+                    <th>Başlangıç</th>
+                    <th>Planlanan Bitiş</th>
+                    <th>Gerçekleşen Bitiş</th>
+                    <th>Not</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($meetingsToday as $meeting): ?>
+                    <tr>
+                        <td><?= htmlspecialchars($meeting['full_name']) ?></td>
+                        <td><?= format_datetime($meeting['started_at'], 'H:i') ?></td>
+                        <td><?= $meeting['expected_end_at'] ? format_datetime($meeting['expected_end_at'], 'H:i') : '-' ?></td>
+                        <td><?= $meeting['ended_at'] ? format_datetime($meeting['ended_at'], 'H:i') : '-' ?></td>
+                        <td><?= htmlspecialchars($meeting['note'] ?? '') ?></td>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    <?php endif; ?>
+</section>
+<?php
+include __DIR__ . '/partials/footer.php';

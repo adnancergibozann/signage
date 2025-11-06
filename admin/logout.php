@@ -1,9 +1,9 @@
 <?php
-require_once __DIR__ . '/../includes/auth.php';
+declare(strict_types=1);
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    logout();
-}
+require __DIR__ . '/../includes/bootstrap.php';
 
-header('Location: /admin/login.php');
+logout();
+
+header('Location: ' . url_for('admin/login.php'));
 exit;
