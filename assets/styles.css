@@ -20,6 +20,10 @@ body {
     color: var(--color-light);
 }
 
+body.admin-body {
+    background: linear-gradient(180deg, rgba(255, 212, 0, 0.06), rgba(0, 0, 0, 0.95));
+}
+
 a {
     color: inherit;
 }
@@ -112,6 +116,11 @@ textarea:focus {
     border: 1px solid rgba(255, 64, 64, 0.5);
 }
 
+.alert-success {
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
 .admin-layout {
     display: grid;
     grid-template-columns: 280px 1fr;
@@ -152,9 +161,109 @@ textarea:focus {
     color: var(--color-dark);
 }
 
-.content {
+.admin-content {
     padding: 2.5rem 3rem;
     background: linear-gradient(135deg, rgba(255, 212, 0, 0.08), rgba(10, 10, 10, 0.95));
+    display: grid;
+    gap: 2rem;
+}
+
+.admin-header h1 {
+    font-size: 2.2rem;
+    margin-bottom: 0.5rem;
+}
+
+.admin-header p {
+    color: rgba(255, 255, 255, 0.7);
+    max-width: 640px;
+}
+
+.form-grid {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.form-control {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.form-actions {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.form-inline {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.form-inline label {
+    margin: 0;
+    font-weight: 500;
+}
+
+.table-responsive {
+    overflow-x: auto;
+    margin: 1rem 0;
+}
+
+.table-responsive table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.table-responsive th,
+.table-responsive td {
+    padding: 0.75rem 0.9rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.audio-grid {
+    display: grid;
+    gap: 1.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.audio-card {
+    background: rgba(255, 255, 255, 0.04);
+    padding: 1.5rem;
+    border-radius: var(--border-radius);
+    display: grid;
+    gap: 0.8rem;
+}
+
+.audio-card h3 {
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+.audio-meta {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.9rem;
+}
+
+.file-input {
+    display: inline-block;
+    padding: 0.8rem 1rem;
+    border: 2px dashed rgba(255, 255, 255, 0.2);
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    text-align: center;
+    transition: border-color 0.2s ease;
+}
+
+.file-input:hover {
+    border-color: var(--color-primary);
+}
+
+.file-input input[type="file"] {
+    display: none;
 }
 
 .table {
