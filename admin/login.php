@@ -20,12 +20,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Yönetim Girişi | Signage</title>
+    <title>Yönetim Girişi | Ezan Saati</title>
     <link rel="stylesheet" href="/assets/styles.css">
 </head>
 <body class="auth-body">
     <main class="auth-container">
-        <h1>Panel Girişi</h1>
+        <h1>Ezan Saati Paneli</h1>
         <?php if ($error): ?>
             <div class="alert alert-error"><?php echo htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?></div>
         <?php endif; ?>

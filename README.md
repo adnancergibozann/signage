@@ -1,14 +1,15 @@
-# Signage
+# Ezan Saati Kiosk Uygulaması
 
-PHP tabanlı bu proje, MySQL (phpMyAdmin) veritabanına bağlı çalışan basit bir kayan yazı (digital signage) uygulamasıdır. Yönetim paneli üzerinden içerik eklenebilir, web sayfası ve gömülebilir widget ile yayınlanabilir.
+Bu proje, MySQL veritabanı ile çalışan ve kiosk modunda kullanılmak üzere tasarlanmış web tabanlı bir ezan saati uygulamasıdır. Yönetim paneli üzerinden konum ayarları yapılabilir, vakitler otomatik olarak güncellenir ve her namaz için farklı ezan sesleri tanımlanabilir. Sistem ezan vakti geldiğinde belirlenen ses dosyalarını otomatik olarak çalar.
 
 ## Özellikler
 
 - Şifre korumalı yönetim paneli
-- Sarı / siyah / beyaz renk paletine uygun modern arayüz
-- Başlık ve açıklama alanlarından oluşan çoklu mesaj desteği
-- Mesaj başına renk seçimi ve kayma süresi ayarı
-- Ana ekran ve widget için otomatik kayan yazı bileşeni
+- Aladhan API üzerinden günlük namaz vakitlerinin otomatik güncellenmesi
+- Ülke/il/ilçe seçimi, hesaplama metodu ve mezhep ayarları
+- Beş vakit ezanı için ayrı ses dosyaları yükleyebilme
+- Cuma selası için özel ses dosyası ve ezandan önceki süreyi belirleme
+- Kiosk moduna uygun tam ekran arayüz, canlı saat, geri sayım ve yaklaşan vakit listesi
 
 ## Kurulum
 
@@ -25,12 +26,18 @@ PHP tabanlı bu proje, MySQL (phpMyAdmin) veritabanına bağlı çalışan basit
 ## Kullanım
 
 - Yönetim paneli: `/admin/login.php`
-- Kayan yazı önizlemesi: `/index.php`
-- Widget sayfası: `/public/widget.php`
+- Kiosk arayüzü: `/index.php`
 
-Widget sayfasını başka sitelere `<iframe src="https://alanadiniz.com/public/widget.php" width="800" height="150"></iframe>` benzeri bir kodla ekleyebilirsiniz.
+### Namaz vakitlerini güncelleme
 
-## Geliştirme İpuçları
+Yönetim panelinde konum bilgilerini kaydederseniz sistem otomatik olarak seçilen konum için namaz vakitlerini alır ve veritabanına kaydeder. İhtiyaç halinde paneldeki "Namaz Vakitlerini Yenile" butonu ile manuel olarak da güncelleme yapabilirsiniz.
 
-- Mesaj sıralaması için `position` alanı kullanılmaktadır. Gerektiğinde bu alan üzerinden manuel sıralama yapılabilir.
-- Tasarım için `assets/styles.css` dosyasını kullanabilirsiniz.
+### Ses dosyalarını yönetme
+
+Her namaz vakti için ayrı ses dosyası yükleyebilir, güncelleyebilir veya silebilirsiniz. Yüklenen dosyalar `public/uploads/audio` dizininde saklanır ve ezan vakti geldiğinde otomatik olarak oynatılır.
+
+## Geliştirme
+
+- Aladhan API kullanımında herhangi bir kota sınırına takılmamak için istek sayısını minimal tutacak şekilde cache mekanizması kullanılmıştır.
+- Kiosk arayüzü otomatik olarak 5 dakikada bir veri tazeler; dilerseniz `assets/prayer.js` içindeki değerleri güncelleyebilirsiniz.
+- Cuma selası, ilgili Cuma günü öğle vaktinden belirlediğiniz dakika kadar önce oynatılır.

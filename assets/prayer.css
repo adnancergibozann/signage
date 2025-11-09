@@ -1,0 +1,231 @@
+:root {
+    --primary: #1f2937;
+    --accent: #ffd400;
+    --background: radial-gradient(circle at top, #0b1120, #030712 60%);
+    --card-bg: rgba(15, 23, 42, 0.75);
+    --text-color: #f8fafc;
+    --muted: #94a3b8;
+    --success: #10b981;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body.kiosk-body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: 'Roboto', 'Segoe UI', sans-serif;
+    background: var(--background);
+    color: var(--text-color);
+    display: flex;
+    justify-content: center;
+}
+
+.kiosk-app {
+    width: 100%;
+    max-width: 1440px;
+    padding: 2.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.kiosk-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    border-bottom: 2px solid rgba(148, 163, 184, 0.2);
+    padding-bottom: 1rem;
+}
+
+.location h1 {
+    margin: 0;
+    font-size: 3rem;
+    letter-spacing: 1px;
+}
+
+.location p {
+    margin: 0.25rem 0 0;
+    color: var(--muted);
+    font-size: 1.25rem;
+}
+
+.clock {
+    text-align: right;
+}
+
+.clock-time {
+    font-size: 4.5rem;
+    font-weight: 600;
+    letter-spacing: 2px;
+}
+
+.clock-date {
+    color: var(--muted);
+    font-size: 1.2rem;
+}
+
+.kiosk-main {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 1.5rem;
+}
+
+.card {
+    background: var(--card-bg);
+    border-radius: 24px;
+    padding: 1.8rem;
+    box-shadow: 0 24px 48px rgba(15, 23, 42, 0.45);
+    backdrop-filter: blur(12px);
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 1rem;
+}
+
+.card h2 {
+    margin: 0;
+    font-size: 1.6rem;
+}
+
+.card .timezone {
+    font-size: 0.95rem;
+    color: var(--muted);
+    background: rgba(148, 163, 184, 0.15);
+    padding: 0.35rem 0.75rem;
+    border-radius: 999px;
+}
+
+.prayer-table table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+}
+
+.prayer-table th,
+.prayer-table td {
+    padding: 0.9rem 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.prayer-table tbody tr.active {
+    background: rgba(16, 185, 129, 0.12);
+}
+
+.prayer-table tbody tr.next {
+    background: rgba(255, 212, 0, 0.12);
+}
+
+.prayer-table .status {
+    font-weight: 600;
+}
+
+.prayer-table .status.past {
+    color: var(--muted);
+}
+
+.prayer-table .status.current {
+    color: var(--success);
+}
+
+.prayer-table .status.upcoming {
+    color: var(--accent);
+}
+
+.placeholder {
+    text-align: center;
+    color: var(--muted);
+    padding: 2rem 0;
+}
+
+.next-event {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    gap: 1rem;
+}
+
+.next-event h2 {
+    font-size: 1.4rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+.next-event .event-label {
+    font-size: 2.1rem;
+    font-weight: 600;
+}
+
+.next-event .event-time {
+    font-size: 3.5rem;
+    letter-spacing: 4px;
+}
+
+.next-event .countdown {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.6rem;
+    background: rgba(148, 163, 184, 0.15);
+    padding: 0.5rem 1.5rem;
+    border-radius: 999px;
+}
+
+.upcoming ul {
+    list-style: none;
+    padding: 0;
+    margin: 1rem 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.upcoming li {
+    display: flex;
+    justify-content: space-between;
+    background: rgba(148, 163, 184, 0.12);
+    padding: 0.9rem 1rem;
+    border-radius: 14px;
+    font-size: 1.05rem;
+}
+
+.upcoming .event-type {
+    font-size: 0.9rem;
+    color: var(--muted);
+}
+
+.kiosk-footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.95rem;
+}
+
+@media (max-width: 1024px) {
+    .kiosk-app {
+        padding: 1.5rem;
+    }
+
+    .kiosk-main {
+        grid-template-columns: 1fr;
+    }
+
+    .kiosk-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+
+    .clock {
+        text-align: left;
+    }
+
+    .clock-time {
+        font-size: 3.2rem;
+    }
+}

@@ -1,187 +1,216 @@
 <?php
 require_once __DIR__ . '/../includes/auth.php';
-require_once __DIR__ . '/../includes/messages.php';
+require_once __DIR__ . '/../includes/prayer.php';
 
 require_login();
-$activePage = 'ticker';
 
-$allowed_colors = [
-    '#FFD400' => 'Sarı',
-    '#0A0A0A' => 'Siyah',
-    '#FFFFFF' => 'Beyaz',
-];
-
+$activePage = 'prayer';
+$pdo = get_pdo();
 $errors = [];
-$flash = $_SESSION['flash'] ?? null;
-unset($_SESSION['flash']);
+$messages = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['action']) && $_POST['action'] === 'create') {
-        $title = trim($_POST['title'] ?? '');
-        $body = trim($_POST['body'] ?? '');
-        $text_color = $_POST['text_color'] ?? '#FFFFFF';
-        $background_color = $_POST['background_color'] ?? '#0A0A0A';
-        $speed = (int) ($_POST['speed'] ?? 30);
+    $action = $_POST['action'] ?? '';
 
-        if ($title === '') {
-            $errors[] = 'Başlık alanı zorunludur.';
+    try {
+        switch ($action) {
+            case 'save_settings':
+                $settings = save_prayer_settings($_POST, $pdo);
+                $added = refresh_prayer_times($pdo);
+                $messages[] = 'Ayarlar kaydedildi ve namaz vakitleri güncellendi (' . $added . ' kayıt).';
+                break;
+            case 'refresh_times':
+                $start = null;
+                $end = null;
+                $days = (int) ($_POST['range_days'] ?? 14);
+                $days = max(1, min(60, $days));
+                $settings = get_prayer_settings($pdo);
+                $timezone = new DateTimeZone($settings['timezone'] ?? 'UTC');
+                $today = new DateTimeImmutable('now', $timezone);
+                $start = $today->setTime(0, 0);
+                $end = $start->add(new DateInterval('P' . $days . 'D'));
+                $count = refresh_prayer_times($pdo, $start, $end);
+                $messages[] = 'Namaz vakitleri güncellendi (' . $count . ' kayıt).';
+                break;
+            case 'upload_audio':
+                $key = $_POST['prayer_key'] ?? '';
+                update_prayer_audio($key, $_FILES['audio'] ?? [] , $pdo);
+                $messages[] = 'Ses dosyası güncellendi.';
+                break;
+            case 'delete_audio':
+                $key = $_POST['prayer_key'] ?? '';
+                delete_prayer_audio($key, $pdo);
+                $messages[] = 'Ses dosyası kaldırıldı.';
+                break;
+            default:
+                $errors[] = 'Bilinmeyen işlem.';
+                break;
         }
-
-        if (!array_key_exists($text_color, $allowed_colors)) {
-            $errors[] = 'Yazı rengi geçerli değil.';
-        }
-
-        if (!array_key_exists($background_color, $allowed_colors)) {
-            $errors[] = 'Arka plan rengi geçerli değil.';
-        }
-
-        $speed = max(5, min(60, $speed));
-
-        if (!$errors) {
-            create_message([
-                'title' => $title,
-                'body' => $body,
-                'text_color' => $text_color,
-                'background_color' => $background_color,
-                'speed' => $speed,
-            ]);
-
-            $_SESSION['flash'] = 'Kayan yazı başarıyla eklendi.';
-            header('Location: /admin/dashboard.php');
-            exit;
-        }
-    }
-
-    if (isset($_POST['action']) && $_POST['action'] === 'delete') {
-        $id = (int) ($_POST['id'] ?? 0);
-        if ($id) {
-            delete_message($id);
-            $_SESSION['flash'] = 'Mesaj silindi.';
-            header('Location: /admin/dashboard.php');
-            exit;
-        }
+    } catch (Throwable $e) {
+        $errors[] = $e->getMessage();
     }
 }
 
-$messages = fetch_messages();
-$user = current_user();
+$settings = get_prayer_settings($pdo);
+$audioProfiles = get_prayer_audio_profiles($pdo);
+$timezone = new DateTimeZone($settings['timezone'] ?? 'UTC');
+$today = new DateTimeImmutable('now', $timezone);
+$schedule = get_prayer_schedule($today->sub(new DateInterval('P1D')), $today->add(new DateInterval('P3D')), $pdo);
+
+function esc_html(string $value): string
+{
+    return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
+}
 ?>
 <!DOCTYPE html>
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Yönetim Paneli | Signage</title>
+    <title>Namaz Ayarları | Ezan Saati Paneli</title>
     <link rel="stylesheet" href="/assets/styles.css">
 </head>
-<body>
-    <div class="admin-layout">
-        <?php include __DIR__ . '/partials/sidebar.php'; ?>
-        <main class="content">
-            <header class="flex" style="justify-content: space-between; margin-bottom: 2rem;">
-                <div>
-                    <h1 style="color: var(--color-primary);">Kayan Yazılar</h1>
-                    <p>Yeni mesajlar ekleyebilir, mevcut içerikleri yönetebilirsin.</p>
-                </div>
-            </header>
+<body class="admin-body">
+<div class="admin-layout">
+    <?php include __DIR__ . '/partials/sidebar.php'; ?>
+    <main class="admin-content">
+        <header class="admin-header">
+            <h1>Namaz Vakti Yönetimi</h1>
+            <p>Konumunuzu seçin, ezan vakitlerini güncelleyin ve her vakit için farklı ses dosyaları tanımlayın.</p>
+        </header>
 
-            <?php if ($errors): ?>
-                <div class="alert alert-error">
-                    <ul>
-                        <?php foreach ($errors as $error): ?>
-                            <li><?php echo htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?></li>
+        <?php foreach ($messages as $message): ?>
+            <div class="alert alert-success"><?php echo esc_html($message); ?></div>
+        <?php endforeach; ?>
+        <?php foreach ($errors as $error): ?>
+            <div class="alert alert-error"><?php echo esc_html($error); ?></div>
+        <?php endforeach; ?>
+
+        <section class="card">
+            <h2>Konum & Hesaplama Ayarları</h2>
+            <form method="post" class="form-grid">
+                <input type="hidden" name="action" value="save_settings">
+                <div class="form-control">
+                    <label for="country">Ülke</label>
+                    <input type="text" id="country" name="country" value="<?php echo esc_html($settings['country']); ?>" required>
+                </div>
+                <div class="form-control">
+                    <label for="city">İl</label>
+                    <input type="text" id="city" name="city" value="<?php echo esc_html($settings['city']); ?>" required>
+                </div>
+                <div class="form-control">
+                    <label for="district">İlçe (opsiyonel)</label>
+                    <input type="text" id="district" name="district" value="<?php echo esc_html($settings['district'] ?? ''); ?>">
+                </div>
+                <div class="form-control">
+                    <label for="calculation_method">Hesaplama Metodu</label>
+                    <select id="calculation_method" name="calculation_method">
+                        <?php foreach (ALADHAN_METHODS as $methodKey => $label): ?>
+                            <option value="<?php echo $methodKey; ?>" <?php echo (int) $settings['calculation_method'] === (int) $methodKey ? 'selected' : ''; ?>><?php echo esc_html($label); ?></option>
                         <?php endforeach; ?>
-                    </ul>
+                    </select>
                 </div>
-            <?php endif; ?>
-
-            <?php if ($flash): ?>
-                <div class="alert" style="background: rgba(255, 212, 0, 0.15); border: 1px solid rgba(255, 212, 0, 0.5);">
-                    <?php echo htmlspecialchars($flash, ENT_QUOTES, 'UTF-8'); ?>
+                <div class="form-control">
+                    <label for="madhab">Mezhep</label>
+                    <select id="madhab" name="madhab">
+                        <option value="hanafi" <?php echo ($settings['madhab'] ?? '') === 'hanafi' ? 'selected' : ''; ?>>Hanefi</option>
+                        <option value="shafi" <?php echo ($settings['madhab'] ?? '') === 'shafi' ? 'selected' : ''; ?>>Şafi</option>
+                    </select>
                 </div>
-            <?php endif; ?>
+                <div class="form-control">
+                    <label for="jumuah_offset_minutes">Cuma selası ezandan kaç dakika önce?</label>
+                    <input type="number" min="0" max="180" id="jumuah_offset_minutes" name="jumuah_offset_minutes" value="<?php echo (int) $settings['jumuah_offset_minutes']; ?>">
+                </div>
+                <div class="form-control">
+                    <label for="auto_refresh_days">Otomatik yenileme süresi (gün)</label>
+                    <input type="number" min="1" max="60" id="auto_refresh_days" name="auto_refresh_days" value="<?php echo (int) $settings['auto_refresh_days']; ?>">
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="button button-primary">Ayarları Kaydet ve Güncelle</button>
+                </div>
+            </form>
+        </section>
 
-            <section class="card" style="margin-bottom: 2rem;">
-                <h2>Yeni Kayan Yazı</h2>
-                <form method="post" class="form-grid">
-                    <input type="hidden" name="action" value="create">
-                    <div>
-                        <label for="title">Başlık</label>
-                        <input type="text" id="title" name="title" required>
-                    </div>
-                    <div>
-                        <label for="body">Detay</label>
-                        <textarea id="body" name="body" placeholder="İsteğe bağlı açıklama..."></textarea>
-                    </div>
-                    <div>
-                        <label for="text_color">Yazı Rengi</label>
-                        <select id="text_color" name="text_color">
-                            <?php foreach ($allowed_colors as $hex => $label): ?>
-                                <option value="<?php echo $hex; ?>"><?php echo $label; ?></option>
+        <section class="card">
+            <h2>Namaz Vakti Tablosu</h2>
+            <p>Şu anki saat dilimi: <strong><?php echo esc_html($settings['timezone']); ?></strong></p>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Tarih</th>
+                        <th>İmsak</th>
+                        <th>Öğle</th>
+                        <th>İkindi</th>
+                        <th>Akşam</th>
+                        <th>Yatsı</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <?php
+                    $dates = array_keys($schedule);
+                    sort($dates);
+                    foreach ($dates as $dateKey):
+                        $day = $schedule[$dateKey];
+                        ?>
+                        <tr>
+                            <td><?php echo esc_html($dateKey); ?></td>
+                            <?php foreach (['fajr','dhuhr','asr','maghrib','isha'] as $key):
+                                $row = null;
+                                foreach ($day as $item) {
+                                    if ($item['key'] === $key) {
+                                        $row = $item;
+                                        break;
+                                    }
+                                }
+                                ?>
+                                <td><?php echo $row ? esc_html($row['time_label']) : '<em>—</em>'; ?></td>
                             <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div>
-                        <label for="background_color">Arka Plan Rengi</label>
-                        <select id="background_color" name="background_color">
-                            <?php foreach ($allowed_colors as $hex => $label): ?>
-                                <option value="<?php echo $hex; ?>" <?php echo $hex === '#0A0A0A' ? 'selected' : ''; ?>><?php echo $label; ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div>
-                        <label for="speed">Kayma Süresi (saniye)</label>
-                        <input type="number" id="speed" name="speed" min="5" max="60" value="30">
-                    </div>
-                    <div style="align-self: end;">
-                        <button type="submit" class="button button-primary" style="width: 100%;">Kaydet</button>
-                    </div>
-                </form>
-            </section>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <form method="post" class="form-inline">
+                <input type="hidden" name="action" value="refresh_times">
+                <label for="range_days">Kaç günlük veri yenilensin?</label>
+                <input type="number" min="1" max="60" id="range_days" name="range_days" value="14">
+                <button type="submit" class="button">Namaz Vakitlerini Yenile</button>
+            </form>
+        </section>
 
-            <section class="card">
-                <h2>Kayıtlı Mesajlar</h2>
-                <?php if (!$messages): ?>
-                    <p>Henüz mesaj eklenmedi.</p>
-                <?php else: ?>
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>Başlık</th>
-                                <th>Açıklama</th>
-                                <th>Renkler</th>
-                                <th>Hız</th>
-                                <th>İşlem</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($messages as $message): ?>
-                                <tr>
-                                    <td><?php echo (int) $message['id']; ?></td>
-                                    <td><?php echo htmlspecialchars($message['title'], ENT_QUOTES, 'UTF-8'); ?></td>
-                                    <td><?php echo htmlspecialchars($message['body'], ENT_QUOTES, 'UTF-8'); ?></td>
-                                    <td>
-                                        <span class="tag-preview">
-                                            <span style="width:14px;height:14px;border-radius:50%;background: <?php echo $message['background_color']; ?>;"></span>
-                                            <span style="width:14px;height:14px;border-radius:50%;background: <?php echo $message['text_color']; ?>;"></span>
-                                        </span>
-                                    </td>
-                                    <td><span class="badge"><?php echo (int) $message['speed']; ?>s</span></td>
-                                    <td>
-                                        <form method="post" onsubmit="return confirm('Bu mesaj silinsin mi?');">
-                                            <input type="hidden" name="action" value="delete">
-                                            <input type="hidden" name="id" value="<?php echo (int) $message['id']; ?>">
-                                            <button type="submit" class="button button-secondary">Sil</button>
-                                        </form>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                <?php endif; ?>
-            </section>
-        </main>
-    </div>
+        <section class="card" id="audio-profiles">
+            <h2>Ezan Sesleri</h2>
+            <p>Her namaz için farklı bir ses dosyası yükleyebilir veya mevcut dosyaları silebilirsiniz.</p>
+            <div class="audio-grid">
+                <?php foreach ($audioProfiles as $profile): ?>
+                    <div class="audio-card">
+                        <h3><?php echo esc_html($profile['label']); ?></h3>
+                        <?php if ($profile['file_url']): ?>
+                            <p class="audio-meta">Yüklendi: <?php echo esc_html($profile['file_name']); ?></p>
+                            <audio controls preload="none" src="<?php echo esc_html($profile['file_url']); ?>"></audio>
+                            <form method="post" class="form-inline">
+                                <input type="hidden" name="action" value="delete_audio">
+                                <input type="hidden" name="prayer_key" value="<?php echo esc_html($profile['key']); ?>">
+                                <button type="submit" class="button button-secondary">Ses Dosyasını Sil</button>
+                            </form>
+                        <?php else: ?>
+                            <p class="audio-meta">Henüz bir ses dosyası yüklenmedi.</p>
+                        <?php endif; ?>
+                        <form method="post" enctype="multipart/form-data" class="form-grid">
+                            <input type="hidden" name="action" value="upload_audio">
+                            <input type="hidden" name="prayer_key" value="<?php echo esc_html($profile['key']); ?>">
+                            <label class="file-input">
+                                <span>Ses dosyası seç (MP3, OGG, WAV)</span>
+                                <input type="file" name="audio" accept="audio/*" required>
+                            </label>
+                            <button type="submit" class="button button-primary">Yükle</button>
+                        </form>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        </section>
+    </main>
+</div>
 </body>
 </html>

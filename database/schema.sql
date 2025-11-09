@@ -125,3 +125,51 @@ CREATE TABLE IF NOT EXISTS countdowns (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_countdown_active (is_active, target_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS prayer_settings (
+    id TINYINT UNSIGNED PRIMARY KEY DEFAULT 1,
+    country VARCHAR(120) NOT NULL DEFAULT 'Türkiye',
+    city VARCHAR(120) NOT NULL DEFAULT 'İstanbul',
+    district VARCHAR(120) NULL,
+    calculation_method TINYINT UNSIGNED NOT NULL DEFAULT 13,
+    madhab ENUM('shafi', 'hanafi') NOT NULL DEFAULT 'hanafi',
+    timezone VARCHAR(64) NOT NULL DEFAULT 'Europe/Istanbul',
+    jumuah_offset_minutes SMALLINT NOT NULL DEFAULT 45,
+    auto_refresh_days SMALLINT NOT NULL DEFAULT 14,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO prayer_settings (id)
+VALUES (1)
+ON DUPLICATE KEY UPDATE id = id;
+
+CREATE TABLE IF NOT EXISTS prayer_audio_profiles (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    prayer_key VARCHAR(32) NOT NULL UNIQUE,
+    display_name VARCHAR(120) NOT NULL,
+    file_path VARCHAR(255) NULL,
+    file_name VARCHAR(255) NULL,
+    file_mime VARCHAR(120) NULL,
+    file_size INT UNSIGNED NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO prayer_audio_profiles (prayer_key, display_name)
+VALUES
+    ('fajr', 'Sabah (İmsak)'),
+    ('dhuhr', 'Öğle'),
+    ('asr', 'İkindi'),
+    ('maghrib', 'Akşam'),
+    ('isha', 'Yatsı'),
+    ('jumuah', 'Cuma Selası')
+ON DUPLICATE KEY UPDATE display_name = VALUES(display_name);
+
+CREATE TABLE IF NOT EXISTS prayer_times (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    prayer_date DATE NOT NULL,
+    prayer_key VARCHAR(32) NOT NULL,
+    azan_at DATETIME NOT NULL,
+    source VARCHAR(50) NULL,
+    fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_prayer (prayer_date, prayer_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
