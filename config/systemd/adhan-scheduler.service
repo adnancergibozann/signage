@@ -1,0 +1,17 @@
+[Unit]
+Description=Adhan Scheduler & Player
+After=network.target sound.target
+
+[Service]
+Type=simple
+Environment=NODE_ENV=production
+EnvironmentFile=/opt/adhan/.env
+WorkingDirectory=/opt/adhan
+ExecStart=/usr/bin/node /opt/adhan/src/server.js
+Restart=always
+RestartSec=5
+User=adhan
+Group=adhan
+
+[Install]
+WantedBy=multi-user.target
