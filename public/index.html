@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Adhan Scheduler & Player</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 min-h-screen">
+  <div id="app" class="max-w-6xl mx-auto py-10">
+    <div class="bg-white shadow rounded p-6" id="login-card">
+      <h1 class="text-2xl font-bold mb-4">Yönetici Girişi</h1>
+      <form id="login-form" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium">E-posta</label>
+          <input name="email" type="email" required class="mt-1 w-full border rounded px-3 py-2" value="admin@example.com" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium">Şifre</label>
+          <input name="password" type="password" required class="mt-1 w-full border rounded px-3 py-2" value="admin123" />
+        </div>
+        <button class="bg-emerald-600 text-white px-4 py-2 rounded" type="submit">Giriş Yap</button>
+      </form>
+    </div>
+
+    <div id="admin-ui" class="hidden">
+      <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold">Adhan Scheduler</h1>
+        <button id="logout" class="text-sm text-red-600">Çıkış</button>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-6 gap-2 mb-6" id="tabs">
+        <button data-tab="dashboard" class="tab-btn bg-emerald-600 text-white px-3 py-2 rounded">Panel</button>
+        <button data-tab="location" class="tab-btn bg-white px-3 py-2 rounded border">Konum & Metod</button>
+        <button data-tab="voices" class="tab-btn bg-white px-3 py-2 rounded border">Ses Setleri</button>
+        <button data-tab="schedule" class="tab-btn bg-white px-3 py-2 rounded border">Takvim</button>
+        <button data-tab="logs" class="tab-btn bg-white px-3 py-2 rounded border">Kayıtlar</button>
+        <button data-tab="settings" class="tab-btn bg-white px-3 py-2 rounded border">Ayarlar</button>
+      </div>
+
+      <div id="tab-panels">
+        <section data-panel="dashboard" class="tab-panel">
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="bg-white shadow rounded p-4">
+              <h2 class="text-xl font-semibold mb-2">Bugünkü Vakitler</h2>
+              <ul id="today-times" class="space-y-1 text-sm"></ul>
+              <div class="mt-4 text-lg" id="next-countdown"></div>
+            </div>
+            <div class="bg-white shadow rounded p-4 space-y-2">
+              <h2 class="text-xl font-semibold">Aktif Ses Seti</h2>
+              <div id="active-voice" class="text-sm"></div>
+              <div class="flex flex-wrap gap-2 mt-4">
+                <button data-prayer="fajr" class="test-btn bg-emerald-500 text-white px-3 py-2 rounded">Sabah</button>
+                <button data-prayer="dhuhr" class="test-btn bg-emerald-500 text-white px-3 py-2 rounded">Öğle</button>
+                <button data-prayer="asr" class="test-btn bg-emerald-500 text-white px-3 py-2 rounded">İkindi</button>
+                <button data-prayer="maghrib" class="test-btn bg-emerald-500 text-white px-3 py-2 rounded">Akşam</button>
+                <button data-prayer="isha" class="test-btn bg-emerald-500 text-white px-3 py-2 rounded">Yatsı</button>
+              </div>
+              <div class="flex gap-2 mt-4">
+                <button id="btn-stop" class="bg-red-500 text-white px-3 py-2 rounded">Durdur</button>
+                <button id="btn-snooze" class="bg-yellow-500 text-white px-3 py-2 rounded">5 dk Ertele</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section data-panel="location" class="tab-panel hidden">
+          <form id="location-form" class="space-y-4">
+            <div class="grid md:grid-cols-3 gap-4">
+              <div>
+                <label class="block text-sm font-medium">Ülke</label>
+                <select id="country" name="country" class="mt-1 w-full border rounded px-3 py-2"></select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium">Şehir</label>
+                <select id="city" name="city" class="mt-1 w-full border rounded px-3 py-2"></select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium">İlçe</label>
+                <select id="district" name="district" class="mt-1 w-full border rounded px-3 py-2"></select>
+              </div>
+            </div>
+            <div class="grid md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium">Enlem</label>
+                <input name="lat" id="lat" class="mt-1 w-full border rounded px-3 py-2" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium">Boylam</label>
+                <input name="lon" id="lon" class="mt-1 w-full border rounded px-3 py-2" />
+              </div>
+            </div>
+            <div class="grid md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium">Metod</label>
+                <select name="method" class="mt-1 w-full border rounded px-3 py-2">
+                  <option value="MuslimWorldLeague">MWL</option>
+                  <option value="UmmAlQura">Umm al-Qura</option>
+                  <option value="Egyptian">Mısır</option>
+                  <option value="Diyanet">Diyanet</option>
+                  <option value="NorthAmerica">Kuzey Amerika</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium">Mezhep</label>
+                <select name="madhab" class="mt-1 w-full border rounded px-3 py-2">
+                  <option value="Shafi">Şafi</option>
+                  <option value="Hanafi">Hanefi</option>
+                </select>
+              </div>
+            </div>
+            <div class="grid md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium">Yüksek Enlem</label>
+                <select name="hlr" class="mt-1 w-full border rounded px-3 py-2">
+                  <option value="MiddleOfTheNight">Gecenin Yarısı</option>
+                  <option value="SeventhOfTheNight">Gece 1/7</option>
+                  <option value="TwilightAngle">Şafak Açısı</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium">Saat Dilimi</label>
+                <input name="timezone" class="mt-1 w-full border rounded px-3 py-2" />
+              </div>
+            </div>
+            <button class="bg-emerald-600 text-white px-4 py-2 rounded" type="submit">Kaydet ve Yenile</button>
+          </form>
+        </section>
+
+        <section data-panel="voices" class="tab-panel hidden">
+          <form id="voice-form" class="flex gap-2 mb-4">
+            <input name="name" placeholder="Yeni set adı" class="border rounded px-3 py-2" />
+            <button class="bg-emerald-600 text-white px-3 py-2 rounded" type="submit">Ekle</button>
+          </form>
+          <div id="voice-list" class="space-y-4"></div>
+        </section>
+
+        <section data-panel="schedule" class="tab-panel hidden">
+          <table class="min-w-full bg-white shadow rounded">
+            <thead>
+              <tr class="bg-slate-200 text-left text-sm">
+                <th class="px-4 py-2">Tarih</th>
+                <th class="px-4 py-2">Sabah</th>
+                <th class="px-4 py-2">Öğle</th>
+                <th class="px-4 py-2">İkindi</th>
+                <th class="px-4 py-2">Akşam</th>
+                <th class="px-4 py-2">Yatsı</th>
+              </tr>
+            </thead>
+            <tbody id="schedule-body" class="text-sm"></tbody>
+          </table>
+        </section>
+
+        <section data-panel="logs" class="tab-panel hidden">
+          <div class="bg-white shadow rounded">
+            <table class="min-w-full text-sm">
+              <thead class="bg-slate-200">
+                <tr>
+                  <th class="px-3 py-2">Zaman</th>
+                  <th class="px-3 py-2">Vakit</th>
+                  <th class="px-3 py-2">Ses Seti</th>
+                  <th class="px-3 py-2">Durum</th>
+                  <th class="px-3 py-2">Mesaj</th>
+                </tr>
+              </thead>
+              <tbody id="logs-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section data-panel="settings" class="tab-panel hidden">
+          <form id="settings-form" class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium">Ana Ses (0-100)</label>
+              <input type="number" name="master_volume" min="0" max="100" class="mt-1 w-full border rounded px-3 py-2" />
+            </div>
+            <div class="flex items-center gap-2">
+              <input type="checkbox" name="fade_enabled" id="fade_enabled" />
+              <label for="fade_enabled">Fade-in/out</label>
+            </div>
+            <div>
+              <label class="block text-sm font-medium">Çalma Modu</label>
+              <select name="playback_mode" class="mt-1 w-full border rounded px-3 py-2">
+                <option value="stop">Yeni ezan başladığında durdur</option>
+                <option value="queue">Sıraya al</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium">Ramazan Ek Offset (dk)</label>
+              <input type="number" name="ramadan_offset" class="mt-1 w-full border rounded px-3 py-2" />
+            </div>
+            <div>
+              <h3 class="font-semibold">Offsetler (dk)</h3>
+              <div class="grid md:grid-cols-5 gap-3">
+                <div><label>Sabah</label><input name="offsets[fajr]" type="number" class="mt-1 w-full border rounded px-2 py-1" /></div>
+                <div><label>Öğle</label><input name="offsets[dhuhr]" type="number" class="mt-1 w-full border rounded px-2 py-1" /></div>
+                <div><label>İkindi</label><input name="offsets[asr]" type="number" class="mt-1 w-full border rounded px-2 py-1" /></div>
+                <div><label>Akşam</label><input name="offsets[maghrib]" type="number" class="mt-1 w-full border rounded px-2 py-1" /></div>
+                <div><label>Yatsı</label><input name="offsets[isha]" type="number" class="mt-1 w-full border rounded px-2 py-1" /></div>
+              </div>
+            </div>
+            <button class="bg-emerald-600 text-white px-4 py-2 rounded" type="submit">Kaydet</button>
+          </form>
+        </section>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/main.js"></script>
+</body>
+</html>

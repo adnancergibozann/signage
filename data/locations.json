@@ -1,0 +1,21 @@
+[
+  {
+    "country": "Türkiye",
+    "cities": [
+      {
+        "city": "İstanbul",
+        "districts": [
+          { "name": "Fatih", "lat": 41.019, "lon": 28.95 },
+          { "name": "Üsküdar", "lat": 41.022, "lon": 29.015 }
+        ]
+      },
+      {
+        "city": "Ankara",
+        "districts": [
+          { "name": "Çankaya", "lat": 39.917, "lon": 32.862 },
+          { "name": "Keçiören", "lat": 39.983, "lon": 32.866 }
+        ]
+      }
+    ]
+  }
+]
