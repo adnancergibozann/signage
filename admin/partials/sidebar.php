@@ -6,6 +6,7 @@ $navItems = [
     'ticker' => ['label' => 'Kayan Yazılar', 'href' => '/admin/dashboard.php'],
     'settings' => ['label' => 'Tema & Logo', 'href' => '/admin/settings.php'],
     'media' => ['label' => 'Medya Yönetimi', 'href' => '/admin/media.php'],
+    'products' => ['label' => 'Ürün İndirimleri', 'href' => '/admin/products.php'],
     'teachers' => ['label' => 'Öğretmenler', 'href' => '/admin/teachers.php'],
     'schedule' => ['label' => 'Ders Programı', 'href' => '/admin/schedule.php'],
     'weather' => ['label' => 'Hava Durumu', 'href' => '/admin/weather.php'],

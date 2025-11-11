@@ -72,6 +72,26 @@ CREATE TABLE IF NOT EXISTS media_items (
     INDEX idx_media_active (is_active, position)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS product_slides (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description VARCHAR(255) NULL,
+    price DECIMAL(10,2) NULL,
+    original_price DECIMAL(10,2) NULL,
+    tag_label VARCHAR(120) NULL,
+    tag_color CHAR(7) NOT NULL DEFAULT '#FFD400',
+    tag_text_color CHAR(7) NOT NULL DEFAULT '#111111',
+    card_background CHAR(7) NOT NULL DEFAULT '#111111',
+    image LONGBLOB NULL,
+    image_mime VARCHAR(100) NULL,
+    auto_background_removed TINYINT(1) NOT NULL DEFAULT 0,
+    position INT NOT NULL DEFAULT 1,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_product_slides_active (is_active, position)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS schedule_periods (
     id TINYINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     period_number TINYINT UNSIGNED NOT NULL,
