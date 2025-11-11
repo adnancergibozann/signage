@@ -10,7 +10,19 @@ $errors = [];
 $flash = $_SESSION['flash'] ?? null;
 unset($_SESSION['flash']);
 
-$pdo = get_pdo();
+try {
+    $pdo = get_pdo();
+} catch (Throwable $exception) {
+    error_log('Admin products bootstrap error: ' . $exception->getMessage());
+    http_response_code(500);
+
+    $displayErrors = filter_var(ini_get('display_errors'), FILTER_VALIDATE_BOOLEAN);
+    $details = $displayErrors ? '<pre>' . htmlspecialchars($exception->getMessage(), ENT_QUOTES, 'UTF-8') . '</pre>' : '';
+    $helpText = 'Veritabanı bağlantısı kurulamadı. MySQL servisinin çalıştığını ve yönetim panelinin kullandığı kimlik bilgilerini doğruladığınızdan emin olun.';
+
+    echo '<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8"><title>Yönetim paneli açılamadı</title><link rel="stylesheet" href="/assets/styles.css"><style>body{background:#0A0A0A;color:#fff;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;}main{max-width:620px;padding:32px;background:rgba(17,17,17,0.92);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.45);}h1{margin-top:0;color:#FFD400;font-size:28px;}p{line-height:1.6;font-size:16px;margin:0 0 16px;}pre{background:#111;border-radius:12px;padding:16px;color:#f88;overflow:auto;font-size:14px;}a{color:#FFD400;text-decoration:none;}</style></head><body><main><h1>Yönetim paneli hazır değil</h1><p>' . htmlspecialchars($helpText, ENT_QUOTES, 'UTF-8') . '</p>' . $details . '<p><a href="/admin/login.php">Giriş sayfasına geri dön</a></p></main></body></html>';
+    exit;
+}
 
 $editingId = isset($_GET['id']) ? max(0, (int) $_GET['id']) : 0;
 $editingItem = $editingId > 0 ? find_product_slide($editingId) : null;
