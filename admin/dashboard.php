@@ -1,6 +1,41 @@
 <?php
-require_once __DIR__ . '/../includes/auth.php';
-require_once __DIR__ . '/../includes/messages.php';
+$rootDir = dirname(__DIR__);
+$bootstraps = [
+    'auth' => $rootDir . '/includes/auth.php',
+    'messages' => $rootDir . '/includes/messages.php',
+];
+
+foreach ($bootstraps as $bootstrapName => $bootstrapPath) {
+    if (!is_file($bootstrapPath)) {
+        http_response_code(500);
+
+        $title = 'Yönetim paneli açılamadı';
+        $message = sprintf(
+            'Gerekli %s başlangıç dosyası bulunamadı. Proje kök dizininde <code>includes/%s.php</code> dosyasının mevcut olduğundan '
+            . 've web sunucusunun onu okuyabildiğinden emin olun.',
+            $bootstrapName === 'auth' ? 'kimlik doğrulama' : 'kayan yazı yönetimi',
+            htmlspecialchars($bootstrapName, ENT_QUOTES, 'UTF-8')
+        );
+        $docRootHint = sprintf(
+            '<p>Beklenen tam yol: <code>%s</code></p>',
+            htmlspecialchars($bootstrapPath, ENT_QUOTES, 'UTF-8')
+        );
+
+        echo '<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8"><title>' . $title . '</title><link rel="stylesheet" '
+            . 'href="/assets/styles.css"><style>body{background:#0A0A0A;color:#fff;font-family:system-ui,sans-serif;display:flex;'
+            . 'align-items:center;justify-content:center;min-height:100vh;margin:0;}main{max-width:620px;padding:32px;background:'
+            . 'rgba(17,17,17,0.92);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.45);}h1{margin-top:0;color:#FFD400;font-'
+            . 'size:28px;}p{line-height:1.6;font-size:16px;margin:0 0 16px;}code{background:#111;padding:2px 6px;border-radius:6px;'
+            . '}</style></head><body><main><h1>' . $title . '</h1><p>' . $message . '</p>' . $docRootHint
+            . '<p>Dosya mevcutsa, <code>require_once</code> satırındaki yolu çalışma dizininize göre güncelleyin veya uygulama '
+            . 'dizininin tamamını web sunucusunun köküne kopyalayın.</p><p><a href="/admin/login.php">Giriş sayfasına geri dön</a></p>'
+            . '</main></body></html>';
+        exit;
+    }
+}
+
+require_once $bootstraps['auth'];
+require_once $bootstraps['messages'];
 
 require_login();
 $activePage = 'ticker';
@@ -15,55 +50,69 @@ $errors = [];
 $flash = $_SESSION['flash'] ?? null;
 unset($_SESSION['flash']);
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['action']) && $_POST['action'] === 'create') {
-        $title = trim($_POST['title'] ?? '');
-        $body = trim($_POST['body'] ?? '');
-        $text_color = $_POST['text_color'] ?? '#FFFFFF';
-        $background_color = $_POST['background_color'] ?? '#0A0A0A';
-        $speed = (int) ($_POST['speed'] ?? 30);
+try {
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        if (isset($_POST['action']) && $_POST['action'] === 'create') {
+            $title = trim($_POST['title'] ?? '');
+            $body = trim($_POST['body'] ?? '');
+            $text_color = $_POST['text_color'] ?? '#FFFFFF';
+            $background_color = $_POST['background_color'] ?? '#0A0A0A';
+            $speed = (int) ($_POST['speed'] ?? 30);
 
-        if ($title === '') {
-            $errors[] = 'Başlık alanı zorunludur.';
+            if ($title === '') {
+                $errors[] = 'Başlık alanı zorunludur.';
+            }
+
+            if (!array_key_exists($text_color, $allowed_colors)) {
+                $errors[] = 'Yazı rengi geçerli değil.';
+            }
+
+            if (!array_key_exists($background_color, $allowed_colors)) {
+                $errors[] = 'Arka plan rengi geçerli değil.';
+            }
+
+            $speed = max(5, min(60, $speed));
+
+            if (!$errors) {
+                create_message([
+                    'title' => $title,
+                    'body' => $body,
+                    'text_color' => $text_color,
+                    'background_color' => $background_color,
+                    'speed' => $speed,
+                ]);
+
+                $_SESSION['flash'] = 'Kayan yazı başarıyla eklendi.';
+                header('Location: /admin/dashboard.php');
+                exit;
+            }
         }
 
-        if (!array_key_exists($text_color, $allowed_colors)) {
-            $errors[] = 'Yazı rengi geçerli değil.';
-        }
-
-        if (!array_key_exists($background_color, $allowed_colors)) {
-            $errors[] = 'Arka plan rengi geçerli değil.';
-        }
-
-        $speed = max(5, min(60, $speed));
-
-        if (!$errors) {
-            create_message([
-                'title' => $title,
-                'body' => $body,
-                'text_color' => $text_color,
-                'background_color' => $background_color,
-                'speed' => $speed,
-            ]);
-
-            $_SESSION['flash'] = 'Kayan yazı başarıyla eklendi.';
-            header('Location: /admin/dashboard.php');
-            exit;
+        if (isset($_POST['action']) && $_POST['action'] === 'delete') {
+            $id = (int) ($_POST['id'] ?? 0);
+            if ($id) {
+                delete_message($id);
+                $_SESSION['flash'] = 'Mesaj silindi.';
+                header('Location: /admin/dashboard.php');
+                exit;
+            }
         }
     }
 
-    if (isset($_POST['action']) && $_POST['action'] === 'delete') {
-        $id = (int) ($_POST['id'] ?? 0);
-        if ($id) {
-            delete_message($id);
-            $_SESSION['flash'] = 'Mesaj silindi.';
-            header('Location: /admin/dashboard.php');
-            exit;
-        }
-    }
+    $messages = fetch_messages();
+} catch (Throwable $exception) {
+    error_log('Admin dashboard bootstrap error: ' . $exception->getMessage());
+    http_response_code(500);
+
+    $displayErrors = filter_var(ini_get('display_errors'), FILTER_VALIDATE_BOOLEAN);
+    $details = $displayErrors ? '<pre>' . htmlspecialchars($exception->getMessage(), ENT_QUOTES, 'UTF-8') . '</pre>' : '';
+    $helpText = 'Veritabanı bağlantısı kurulamadı. MySQL servisinin çalıştığını ve yapılandırma dosyasındaki kimlik bilgilerini doğruladığınızdan emin olun.';
+
+    echo '<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8"><title>Yönetim paneli açılamadı</title><link rel="stylesheet" '
+        . 'href="/assets/styles.css"><style>body{background:#0A0A0A;color:#fff;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;}main{max-width:620px;padding:32px;background:rgba(17,17,17,0.92);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.45);}h1{margin-top:0;color:#FFD400;font-size:28px;}p{line-height:1.6;font-size:16px;margin:0 0 16px;}pre{background:#111;border-radius:12px;padding:16px;color:#f88;overflow:auto;font-size:14px;}a{color:#FFD400;text-decoration:none;}</style></head><body><main><h1>Yönetim paneli hazır değil</h1><p>'
+        . htmlspecialchars($helpText, ENT_QUOTES, 'UTF-8') . '</p>' . $details . '<p><a href="/admin/login.php">Giriş sayfasına geri dön</a></p></main></body></html>';
+    exit;
 }
-
-$messages = fetch_messages();
 $user = current_user();
 ?>
 <!DOCTYPE html>

@@ -9,6 +9,7 @@ PHP tabanlı bu proje, MySQL (phpMyAdmin) veritabanına bağlı çalışan basit
 - Başlık ve açıklama alanlarından oluşan çoklu mesaj desteği
 - Mesaj başına renk seçimi ve kayma süresi ayarı
 - Ana ekran ve widget için otomatik kayan yazı bileşeni
+- Ürün indirimleri için görselli LED slider (1536x384 uyumlu)
 
 ## Kurulum
 
@@ -27,6 +28,7 @@ PHP tabanlı bu proje, MySQL (phpMyAdmin) veritabanına bağlı çalışan basit
 - Yönetim paneli: `/admin/login.php`
 - Kayan yazı önizlemesi: `/index.php`
 - Widget sayfası: `/public/widget.php`
+- LED ürün slider'ı: `/public/led-products.php`
 
 Widget sayfasını başka sitelere `<iframe src="https://alanadiniz.com/public/widget.php" width="800" height="150"></iframe>` benzeri bir kodla ekleyebilirsiniz.
 

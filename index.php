@@ -2,7 +2,20 @@
 
 require_once __DIR__ . '/includes/signage.php';
 
-$data = get_signage_data();
+try {
+    $data = get_signage_data();
+} catch (Throwable $exception) {
+    error_log('Signage bootstrap error: ' . $exception->getMessage());
+    http_response_code(500);
+
+    $displayErrors = filter_var(ini_get('display_errors'), FILTER_VALIDATE_BOOLEAN);
+    $details = $displayErrors ? '<pre>' . htmlspecialchars($exception->getMessage(), ENT_QUOTES, 'UTF-8') . '</pre>' : '';
+    $helpText = 'Veritabanı bağlantısı kurulamadı. MySQL servisinin çalıştığını ve `config/config.php` dosyasındaki bilgilerin doğru olduğunu kontrol edin.';
+
+    echo '<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8"><title>Bağlantı Hatası</title><style>body{font-family:system-ui,sans-serif;background:#0A0A0A;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;padding:0;}main{max-width:640px;padding:32px;background:rgba(17,17,17,0.92);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.45);}h1{margin-top:0;font-size:28px;color:#FFD400;}p{line-height:1.6;font-size:16px;margin:0 0 16px;}pre{background:#111;border-radius:12px;padding:16px;color:#f88;overflow:auto;font-size:14px;}</style></head><body><main><h1>Sistem hazır değil</h1><p>' . htmlspecialchars($helpText, ENT_QUOTES, 'UTF-8') . '</p>' . $details . '<p>Kurulum adımları için README dosyasına göz atabilir veya veritabanı bağlantısını güncelledikten sonra sayfayı yenileyebilirsiniz.</p></main></body></html>';
+    exit;
+}
+
 $messages = $data['ticker'];
 $marqueeSpeed = $messages ? max(array_column($messages, 'speed')) : 30;
 $marqueeSpeed = max(5, min(60, (int) $marqueeSpeed));
