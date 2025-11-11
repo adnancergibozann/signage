@@ -1,6 +1,42 @@
 <?php
-require_once __DIR__ . '/../includes/auth.php';
-require_once __DIR__ . '/../includes/products.php';
+$rootDir = dirname(__DIR__);
+$authBootstrap = $rootDir . '/includes/auth.php';
+$productsBootstrap = $rootDir . '/includes/products.php';
+
+foreach ([
+    'auth' => $authBootstrap,
+    'products' => $productsBootstrap,
+] as $bootstrapName => $bootstrapPath) {
+    if (!is_file($bootstrapPath)) {
+        http_response_code(500);
+
+        $title = 'Yönetim paneli açılamadı';
+        $message = sprintf(
+            'Gerekli %s başlangıç dosyası bulunamadı. Proje kök dizininde <code>includes/%s.php</code> dosyasının mevcut olduğundan '
+            . 've web sunucusunun onu okuyabildiğinden emin olun.',
+            $bootstrapName === 'auth' ? 'kimlik doğrulama' : 'ürün yönetimi',
+            htmlspecialchars($bootstrapName, ENT_QUOTES, 'UTF-8')
+        );
+        $docRootHint = sprintf(
+            '<p>Beklenen tam yol: <code>%s</code></p>',
+            htmlspecialchars($bootstrapPath, ENT_QUOTES, 'UTF-8')
+        );
+
+        echo '<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8"><title>' . $title . '</title><link rel="stylesheet" '
+            . 'href="/assets/styles.css"><style>body{background:#0A0A0A;color:#fff;font-family:system-ui,sans-serif;display:flex;'
+            . 'align-items:center;justify-content:center;min-height:100vh;margin:0;}main{max-width:620px;padding:32px;background:'
+            . 'rgba(17,17,17,0.92);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.45);}h1{margin-top:0;color:#FFD400;'
+            . 'font-size:28px;}p{line-height:1.6;font-size:16px;margin:0 0 16px;}code{background:#111;padding:2px 6px;border-radius:'
+            . '6px;}</style></head><body><main><h1>' . $title . '</h1><p>' . $message . '</p>' . $docRootHint
+            . '<p>Dosya mevcutsa, <code>require_once</code> satırındaki yolu çalışma dizininize göre güncelleyin veya uygulama '
+            . 'dizininin tamamını web sunucusunun köküne kopyalayın.</p><p><a href="/admin/login.php">Giriş sayfasına geri dön</a></p>'
+            . '</main></body></html>';
+        exit;
+    }
+}
+
+require_once $authBootstrap;
+require_once $productsBootstrap;
 
 require_login();
 
